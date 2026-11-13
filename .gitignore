@@ -1,0 +1,29 @@
+# Operating System Files
+Thumbs.db
+Desktop.ini
+.DS_Store
+*.tmp
+~$*.docx
+~$*.pptx
+~$*.xlsx
+
+# Node.js & Web Build Outputs (for upcoming web app)
+node_modules/
+dist/
+build/
+.cache/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment & Secrets
+.env
+.env.local
+.env.*.local
+
+# IDEs & Editors
+.vscode/
+.idea/
+*.suo
+*.user
