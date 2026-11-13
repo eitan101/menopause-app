@@ -1,18 +1,716 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="he" dir="rtl">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>מערכת ניהול מטופלת בגיל המעבר | מרפאת רופאת המשפחה</title>
-    <meta name="description" content="מערכת תומכת החלטה קלינית (CDSS) לניהול שלבי גיל המעבר, התאמת טיפול הורמונלי ומעקב אורכי במרפאת הקהילה. מתכונת Zero-Server מקומית ומאובטחת." />
-    <!-- Google Fonts Hebrew -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;500;600;700;800&family=Rubik:wght@400;500;600;700&display=swap" rel="stylesheet">
-  </head>
-  <body class="bg-slate-50 text-slate-800 font-hebrew antialiased min-h-screen selection:bg-teal-100 selection:text-teal-900">
-    <div id="root"></div>
-    <script type="module" src="./src/main.tsx"></script>
-  </body>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>מערכת ניהול מטופלת בגיל המעבר | מרפאת רופאת המשפחה (Zero-Server CDSS)</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts Hebrew -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;500;600;700;800&family=Rubik:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Assistant', 'Rubik', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    @media print {
+      .no-print { display: none !important; }
+      .print-only { display: block !important; }
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col">
+  <!-- סרגל עליון -->
+  <header class="bg-gradient-to-l from-teal-800 via-teal-700 to-teal-900 text-white shadow-md sticky top-0 z-30 no-print">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center border border-white/20 text-teal-200 font-bold text-lg">
+          🌸
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-xl font-bold tracking-tight">ניהול גיל המעבר</h1>
+            <span class="text-xs bg-teal-600 text-teal-100 px-2 py-0.5 rounded-full font-medium border border-teal-400/30">
+              Zero-Server CDSS
+            </span>
+          </div>
+          <p class="text-xs text-teal-100/80">מרפאת רופאת המשפחה | מעקב אורכי רב-מפגשי מאובטח</p>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <button onclick="openModuleH()" class="bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-sm transition">
+          📖 מודול H לרופא/ה
+        </button>
+        <button onclick="exportJson()" class="bg-white/10 hover:bg-white/20 text-white text-xs font-medium px-3 py-1.5 rounded-lg border border-white/20 transition">
+          💾 שמור תיק (JSON)
+        </button>
+        <button onclick="document.getElementById('importFileInput').click()" class="bg-white/10 hover:bg-white/20 text-white text-xs font-medium px-3 py-1.5 rounded-lg border border-white/20 transition">
+          📂 טען תיק
+        </button>
+        <input type="file" id="importFileInput" accept=".json" class="hidden" onchange="importJson(event)">
+        <button onclick="resetPatient()" class="bg-teal-950/80 hover:bg-teal-950 text-teal-200 text-xs px-2.5 py-1.5 rounded-lg border border-teal-800 transition">
+          🔄 מטופלת חדשה
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- סרגל שלבים (Stepper) -->
+  <div class="bg-white border-b border-slate-200 py-3 px-4 shadow-sm no-print">
+    <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-3">
+      <button onclick="switchStage(1)" id="stepBtn1" class="flex items-center gap-3 p-3 rounded-xl border bg-teal-50 border-teal-500 text-right transition">
+        <div id="stepNum1" class="w-8 h-8 rounded-lg bg-teal-600 text-white flex items-center justify-center font-bold text-sm shrink-0">01</div>
+        <div>
+          <div class="text-xs font-bold text-teal-900">שלב 1: איסוף נתונים ושער שלמות</div>
+          <div class="text-[11px] text-slate-500">אנמנזה, STRAW+10, אינטראקציות ובדיקות עזר</div>
+        </div>
+      </button>
+
+      <button onclick="switchStage(2)" id="stepBtn2" class="flex items-center gap-3 p-3 rounded-xl border bg-slate-50 border-slate-200 text-right transition">
+        <div id="stepNum2" class="w-8 h-8 rounded-lg bg-slate-200 text-slate-600 flex items-center justify-center font-bold text-sm shrink-0">02</div>
+        <div>
+          <div class="text-xs font-bold text-slate-800">שלב 2: הגדרת טיפול והמלצות</div>
+          <div class="text-[11px] text-slate-500">משטר HRT, ציר מתן עורי/פומי, ארסנל תרופות</div>
+        </div>
+      </button>
+
+      <button onclick="switchStage(3)" id="stepBtn3" class="flex items-center gap-3 p-3 rounded-xl border bg-slate-50 border-slate-200 text-right transition">
+        <div id="stepNum3" class="w-8 h-8 rounded-lg bg-slate-200 text-slate-600 flex items-center justify-center font-bold text-sm shrink-0">03</div>
+        <div>
+          <div class="text-xs font-bold text-slate-800">שלב 3: מעקב אורכי ופתרון בעיות</div>
+          <div class="text-[11px] text-slate-500">ציר זמן ביקורים, ניהול דימומים, TVS ושינוי מינונים</div>
+        </div>
+      </button>
+    </div>
+  </div>
+
+  <!-- תוכן מרכזי -->
+  <main class="max-w-7xl mx-auto px-4 py-6 flex-1">
+    <!-- שלב 1: איסוף נתונים ושער שלמות -->
+    <div id="stage1Container" class="space-y-6">
+      <!-- כותרת ו-STRAW Live Badge -->
+      <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="bg-teal-100 text-teal-800 text-xs font-bold px-2.5 py-0.5 rounded-full">שלב 1 מתוך 3</span>
+            <h2 class="text-xl font-bold text-slate-900">מפגש ראשון: איסוף נתונים ושער שלמות הנתונים</h2>
+          </div>
+          <p class="text-sm text-slate-600 mt-1">הערכה דמוגרפית, אנמנזה גינקולוגית, סיווג STRAW+10, זיהוי אינטראקציות ושער בטיחות רפואי.</p>
+        </div>
+
+        <div class="bg-teal-50 border border-teal-200 rounded-xl p-3 shrink-0 text-right">
+          <div class="text-[11px] font-semibold text-teal-800">סיווג STRAW+10 נוכחי:</div>
+          <div id="strawTitle" class="font-bold text-sm text-teal-950 mt-0.5">פרי-מנופאוזה מאוחרת (Late Transition)</div>
+          <div id="strawCode" class="text-[11px] text-teal-700 font-medium">שלב: -1</div>
+        </div>
+      </div>
+
+      <!-- גריד טפסים -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- 1. דמוגרפיה ומדדים -->
+        <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+          <h3 class="font-bold text-slate-900 text-base border-b pb-2">1. דמוגרפיה ומדדים בסיסיים</h3>
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+            <div>
+              <label class="block text-slate-700 mb-1">שם המטופלת</label>
+              <input type="text" id="patientName" value="שרה כהן" oninput="updateCalculations()" class="w-full p-2 border rounded-lg">
+            </div>
+            <div>
+              <label class="block text-slate-700 mb-1">ת.ז / מזהה</label>
+              <input type="text" id="patientId" value="12345678" oninput="updateCalculations()" class="w-full p-2 border rounded-lg">
+            </div>
+            <div>
+              <label class="block text-slate-700 mb-1 font-bold">גיל (שנים) *</label>
+              <input type="number" id="patientAge" value="52" oninput="updateCalculations()" class="w-full p-2 border rounded-lg font-bold text-teal-900">
+            </div>
+            <div>
+              <label class="block text-slate-700 mb-1">גובה (ס"מ)</label>
+              <input type="number" id="patientHeight" value="164" oninput="updateCalculations()" class="w-full p-2 border rounded-lg">
+            </div>
+            <div>
+              <label class="block text-slate-700 mb-1">משקל (ק"ג)</label>
+              <input type="number" id="patientWeight" value="72" oninput="updateCalculations()" class="w-full p-2 border rounded-lg">
+            </div>
+            <div>
+              <label class="block text-slate-700 mb-1">BMI מחושב</label>
+              <div id="bmiDisplay" class="p-2 border rounded-lg font-bold bg-slate-50 text-slate-800">26.8 kg/m²</div>
+            </div>
+            <div>
+              <label class="block text-slate-700 mb-1">ל"ד סיסטולי</label>
+              <input type="number" id="bpSystolic" value="125" oninput="updateCalculations()" class="w-full p-2 border rounded-lg">
+            </div>
+            <div>
+              <label class="block text-slate-700 mb-1">ל"ד דיאסטולי</label>
+              <input type="number" id="bpDiastolic" value="80" oninput="updateCalculations()" class="w-full p-2 border rounded-lg">
+            </div>
+            <div>
+              <label class="block text-slate-700 mb-1">עיסוק</label>
+              <input type="text" id="patientOccupation" value="הוראה" class="w-full p-2 border rounded-lg">
+            </div>
+          </div>
+
+          <div class="pt-2 border-t flex flex-wrap gap-4 text-xs">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" id="isSmoker" onchange="updateCalculations()" class="rounded text-teal-600">
+              <span class="font-medium text-slate-800">מעשנת פעילה</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" id="exerciseRegular" checked class="rounded text-teal-600">
+              <span class="font-medium text-slate-800">פעילות גופנית סדירה</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 2. דפוס דימומים נוכחי -->
+        <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+          <h3 class="font-bold text-slate-900 text-base border-b pb-2">2. דפוס דימומים נוכחי</h3>
+          <div class="space-y-3 text-xs">
+            <div>
+              <label class="block text-slate-700 mb-1 font-medium">דפוס המחזורים ב-12 החודשים האחרונים:</label>
+              <select id="cyclePattern" onchange="updateCalculations()" class="w-full p-2.5 border rounded-xl font-medium bg-white">
+                <option value="REGULAR">מחזורים סדירים עדיין</option>
+                <option value="VARIATION_OVER_7_DAYS">שוני מתמיד של ≥7 ימים באורך המחזור (Early Transition)</option>
+                <option value="SKIPPED_OVER_60_DAYS" selected>אל-ווסת של ≥60 יום / דילוג על 2 מחזורים (Late Transition)</option>
+                <option value="AMENORRHEA_OVER_12_MONTHS">היעדר ווסת מעל 12 חודשים רצופים (Postmenopause)</option>
+              </select>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-slate-700 mb-1">תאריך ווסת אחרונה (FMP/LMP)</label>
+                <input type="date" id="lastPeriodDate" value="2026-06-15" class="w-full p-2 border rounded-lg">
+              </div>
+              <div>
+                <label class="block text-slate-700 mb-1">עוצמת הדימומים</label>
+                <select id="bleedingIntensity" onchange="updateCalculations()" class="w-full p-2 border rounded-lg">
+                  <option value="NORMAL">תקינה / ממוצעת</option>
+                  <option value="LIGHT">קלה / הכתמות בלבד</option>
+                  <option value="HEAVY">כבדה מוגברת (סכנת אנמיה)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="flex gap-4 pt-2">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="hadHysterectomy" onchange="updateCalculations()" class="rounded text-teal-600">
+                <span class="font-bold text-slate-900">כריתת רחם בעבר (ללא רחם)</span>
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="hadRrso" onchange="updateCalculations()" class="rounded text-teal-600">
+                <span class="font-bold text-slate-900">כריתת שחלות מניעתית (RRSO)</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. אינטראקציות ותרופות (דגש GLP-1) -->
+        <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-3">
+          <h3 class="font-bold text-slate-900 text-base border-b pb-2">3. תרופות קבועות ואינטראקציות</h3>
+          <div class="space-y-2 text-xs">
+            <label class="flex items-start gap-2.5 p-2.5 bg-purple-50 rounded-xl border border-purple-200 cursor-pointer">
+              <input type="checkbox" id="takingGlp1" onchange="updateCalculations()" class="rounded text-purple-600 mt-0.5">
+              <div>
+                <span class="font-bold text-purple-950 block">נוטלת אנלוגים ל-GLP-1 / GIP (אוזמפיק, וויגובי, מונג'רו)</span>
+                <span class="text-[11px] text-purple-800">האטת ריקון קיבה פוגעת בספיגת פרוגסטרון פומי ⬅️ העדפת מירנה / מדבקה משולבת.</span>
+              </div>
+            </label>
+
+            <label class="flex items-start gap-2.5 p-2 bg-slate-50 rounded-lg border border-slate-200 cursor-pointer">
+              <input type="checkbox" id="takingEnzymeInducers" onchange="updateCalculations()" class="rounded text-teal-600 mt-0.5">
+              <div>
+                <span class="font-bold text-slate-900 block">משרני אנזימי כבד (קרבמזפין, פניטואין, ריפמפיצין)</span>
+              </div>
+            </label>
+
+            <label class="flex items-start gap-2.5 p-2 bg-slate-50 rounded-lg border border-slate-200 cursor-pointer">
+              <input type="checkbox" id="takingLevothyroxine" onchange="updateCalculations()" class="rounded text-teal-600 mt-0.5">
+              <div>
+                <span class="font-bold text-slate-900 block">אלטרוקסין / יוטירוקס (Levothyroxine)</span>
+              </div>
+            </label>
+
+            <label class="flex items-start gap-2.5 p-2.5 bg-rose-50 rounded-xl border border-rose-200 cursor-pointer">
+              <input type="checkbox" id="historyOfBreastCancer" onchange="updateCalculations()" class="rounded text-rose-600 mt-0.5">
+              <div>
+                <span class="font-bold text-rose-950 block">סרטן שד נוכחי או בעבר (התווית נגד מוחלטת ל-HRT)</span>
+                <span class="text-[11px] text-rose-800">נפתח מסלול חלופות לא-הורמונליות בלבד (ויוזה, ונלפקסין, CBT).</span>
+              </div>
+            </label>
+
+            <label class="flex items-start gap-2.5 p-2 bg-rose-50 rounded-lg border border-rose-200 cursor-pointer">
+              <input type="checkbox" id="uninvestigatedBleeding" onchange="updateCalculations()" class="rounded text-rose-600 mt-0.5">
+              <div>
+                <span class="font-bold text-rose-950 block">דימום גניטלי חריג שטרם בורר גינקולוגית</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- 4. בדיקות סקר שגרה ומעבדה -->
+        <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-3">
+          <h3 class="font-bold text-slate-900 text-base border-b pb-2">4. בדיקות סקר ומעבדה (שער שלמות)</h3>
+          <div class="space-y-3 text-xs">
+            <div>
+              <label class="block text-slate-700 mb-1 font-medium">סקר שד / ממוגרפיה *</label>
+              <select id="mammographyStatus" onchange="updateCalculations()" class="w-full p-2 border rounded-lg bg-emerald-50 text-emerald-950 border-emerald-300 font-semibold">
+                <option value="UP_TO_DATE_NORMAL" selected>מעודכנת ותקינה (בשנתיים האחרונות)</option>
+                <option value="OVERDUE">לא מעודכנת / מעל שנתיים</option>
+                <option value="ABNORMAL_SUSPECTED">ממצא חריג הדורש המשך בירור</option>
+                <option value="NOT_PERFORMED">מעולם לא בוצעה</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-slate-700 mb-1 font-medium">משטח צוואר הרחם (Pap / HPV)</label>
+              <select id="papHpvStatus" onchange="updateCalculations()" class="w-full p-2 border rounded-lg">
+                <option value="UP_TO_DATE_NORMAL" selected>תקין ומעודכן</option>
+                <option value="OVERDUE">לא מעודכן</option>
+                <option value="ABNORMAL">חריג (דורש קולפוסקופיה)</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-slate-700 mb-1 font-medium">ספירת דם ומאגרי ברזל</label>
+              <select id="cbcStatus" onchange="updateCalculations()" class="w-full p-2 border rounded-lg">
+                <option value="NORMAL" selected>תקינה</option>
+                <option value="ANEMIA">אנמיה ידועה</option>
+                <option value="NOT_TESTED">לא נבדק לאחרונה</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- שער שלמות הנתונים (Completeness Gate Box) -->
+      <div id="gateBox" class="rounded-2xl p-6 border shadow-sm bg-gradient-to-l from-emerald-50 to-teal-50 border-emerald-300">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h3 id="gateTitle" class="text-base font-bold text-emerald-950">
+              ✅ שער שלמות הנתונים אושר! ניתן להמשיך לשלב 2
+            </h3>
+            <p id="gateDesc" class="text-xs text-slate-700 mt-1">
+              כל המדדים הקליניים ובדיקות הסקר תקינים ומעודכנים.
+            </p>
+            <div id="gateReasons" class="hidden mt-2 text-xs text-rose-900 bg-white/80 p-3 rounded-xl border border-rose-200"></div>
+          </div>
+
+          <div class="flex gap-2 shrink-0">
+            <button id="gateActionBtn" onclick="switchStage(2)" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow transition">
+              המשך לשלב 2: הגדרת טיפול ⬅️
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- שלב 2: הגדרת טיפול והמלצות -->
+    <div id="stage2Container" class="hidden space-y-6">
+      <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="bg-teal-100 text-teal-800 text-xs font-bold px-2.5 py-0.5 rounded-full">שלב 2 מתוך 3</span>
+            <h2 class="text-xl font-bold text-slate-900">הגדרת טיפול והמלצות קליניות</h2>
+          </div>
+          <p class="text-sm text-slate-600 mt-1">התאמת משטר טיפולי אישי, בחירת תכשירים בישראל, ציר מתן עורי/פומי ותיאום ציפיות.</p>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="copyEmrText()" class="bg-white hover:bg-slate-50 text-teal-800 border border-teal-300 text-xs font-bold px-4 py-2 rounded-xl shadow-sm transition">
+            📋 העתק לתיק רפואי (EMR)
+          </button>
+        </div>
+      </div>
+
+      <!-- כרטיסיות משטר וציר מתן -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-gradient-to-br from-teal-50 to-white rounded-2xl p-5 border border-teal-200 shadow-sm space-y-2">
+          <span class="text-xs font-bold text-teal-700 uppercase">משטר הטיפול הנבחר</span>
+          <h3 id="stage2RegimenTitle" class="text-lg font-extrabold text-teal-950">טיפול משולב סדרתי / מחזורי (sHRT)</h3>
+          <p id="stage2RegimenDesc" class="text-xs text-slate-700 bg-white/80 p-3 rounded-xl border border-teal-100">
+            באישה עם רחם בפרי-מנופאוזה: אסטרוגן רציף בשילוב פרוגסטוגן לפחות 12-14 ימים בחודש להגנה על רירית הרחם.
+          </p>
+        </div>
+
+        <div class="bg-gradient-to-br from-slate-50 to-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-2">
+          <span class="text-xs font-bold text-slate-600 uppercase">ציר מתן האסטרוגן המומלץ</span>
+          <h3 id="stage2RouteTitle" class="text-lg font-extrabold text-slate-900">מתן עורי (Transdermal) – ג'ל או מדבקות</h3>
+          <div id="stage2RouteRationale" class="text-xs text-slate-700 bg-white p-3 rounded-xl border border-slate-200">
+            עוקף מעבר כבדי ראשוני, אינו מעלה סיכון ל-VTE ולשבץ, ואינו מעלה לחץ דם.
+          </div>
+        </div>
+      </div>
+
+      <!-- פירוט התכשירים המסחריים -->
+      <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
+        <h3 class="font-bold text-slate-900 text-base border-b pb-3">מרשם והמלצות נטילה (שמות מסחריים בישראל)</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+          <div class="p-4 rounded-xl border border-teal-200 bg-teal-50/40 space-y-2">
+            <span class="font-bold text-teal-800">רכיב אסטרוגני:</span>
+            <h4 id="estrogenBrand" class="font-extrabold text-base text-teal-950">אסטרוג'ל (Estrogel 0.06%)</h4>
+            <p id="estrogenSchedule" class="bg-white p-2.5 rounded-lg border border-teal-100">
+              1-2 לחיצות ביום, מריחה בבוקר על עור יבש (זרועות/ירכיים) ללא שטיפה בשעה הראשונה.
+            </p>
+          </div>
+
+          <div class="p-4 rounded-xl border border-indigo-200 bg-indigo-50/40 space-y-2">
+            <span class="font-bold text-indigo-800">רכיב פרוגסטוגני:</span>
+            <h4 id="progestogenBrand" class="font-extrabold text-base text-indigo-950">אוטרוגסטן (Utrogestan 200mg)</h4>
+            <p id="progestogenSchedule" class="bg-white p-2.5 rounded-lg border border-indigo-100">
+              כמוסה אחת של 200 מ"ג בלילה לפני השינה במשך 12-14 ימים רצופים בכל חודש (ימים 15-28).
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- דף תיאום ציפיות -->
+      <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-3">
+        <h3 class="font-bold text-slate-900 text-base border-b pb-2">דגשים לתיאום ציפיות עם המטופלת</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+          <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
+            <strong>6 החודשים הראשונים:</strong> הכתמות או דימומים קלים בלתי סדירים מופיעים אצל כ-40% מהנשים והם תופעה שפירה וצפויה.
+          </div>
+          <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
+            <strong>גודש בחזה:</strong> תגובה אסטרוגנית זמנית שחולפת לרוב תוך מספר שבועות.
+          </div>
+          <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
+            <strong>נטילת פרוגסטרון בלילה:</strong> משרה ישנוניות ומשפרת משמעותית את איכות השינה.
+          </div>
+          <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
+            <strong>מועד ביקורת:</strong> מעקב כעבור 3 חודשים להערכת תגובה ומדידת לחץ דם.
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-end pt-2">
+        <button onclick="switchStage(3)" class="bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs px-6 py-3 rounded-xl shadow transition">
+          מעבר לשלב 3: מעקב אורכי ופתרון בעיות ⬅️
+        </button>
+      </div>
+    </div>
+
+    <!-- שלב 3: מעקב אורכי ופתרון בעיות -->
+    <div id="stage3Container" class="hidden space-y-6">
+      <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="bg-teal-100 text-teal-800 text-xs font-bold px-2.5 py-0.5 rounded-full">שלב 3 מתוך 3</span>
+            <h2 class="text-xl font-bold text-slate-900">מעקב אורכי ופתרון בעיות (Longitudinal Care)</h2>
+          </div>
+          <p class="text-sm text-slate-600 mt-1">ציר זמן ביקורים, ניהול דימומים לפי עץ דר' פרייברג ו-BMS, ופתרון תופעות לוואי.</p>
+        </div>
+      </div>
+
+      <!-- טופס רישום ביקור מעקב חדש -->
+      <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-5">
+        <h3 class="font-bold text-slate-900 text-base border-b pb-2">רישום ביקור מעקב חדש</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+          <div>
+            <label class="block text-slate-700 mb-1">תאריך ביקור מעקב</label>
+            <input type="date" id="fuDate" class="w-full p-2 border rounded-lg">
+          </div>
+          <div>
+            <label class="block text-slate-700 mb-1 font-bold">חודשים מתחילת הטיפול</label>
+            <input type="number" id="fuMonths" value="3" oninput="updateFuTriage()" class="w-full p-2 border rounded-lg font-bold text-teal-900">
+          </div>
+        </div>
+
+        <!-- מעקב דימומים -->
+        <div class="bg-rose-50/50 p-4 rounded-xl border border-rose-200 space-y-3 text-xs">
+          <h4 class="font-bold text-rose-950 text-sm">מעקב דימומים בלתי סדירים (דר' מרב פרייברג & BMS 2024)</h4>
+          <label class="flex items-center gap-2 p-2 bg-white rounded-lg border border-rose-200 cursor-pointer">
+            <input type="checkbox" id="fuHasBleeding" onchange="updateFuTriage()" class="rounded text-rose-600">
+            <span class="font-bold text-rose-950">הופיע דימום חדש או הכתמות</span>
+          </label>
+
+          <div id="fuBleedingDetails" class="hidden space-y-3">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label class="flex items-center gap-2">
+                <input type="checkbox" id="fuIsHeavy" onchange="updateFuTriage()" class="rounded text-rose-600">
+                <span>דימום כבד או ממושך</span>
+              </label>
+              <div>
+                <label class="block text-slate-700 mb-1">עובי רירית ב-TVS (מ"מ - אם בוצע)</label>
+                <input type="number" step="0.5" id="fuTvsMm" oninput="updateFuTriage()" placeholder="למשל 3.5 או 8 מ&quot;מ" class="w-36 p-1.5 border rounded">
+              </div>
+            </div>
+
+            <div id="fuTriageBox" class="p-3 rounded-xl border font-semibold bg-emerald-50 border-emerald-300 text-emerald-950">
+              דימום ב-6 חודשים ראשונים ⬅️ שפיר, ניהול שמרני והתאמת פרוגסטוגן.
+            </div>
+          </div>
+        </div>
+
+        <button onclick="logFollowUpVisit()" class="bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs px-6 py-2.5 rounded-xl shadow transition">
+          💾 תעד ביקור זה בציר הזמן
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- פוטר -->
+  <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500 no-print">
+    <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+      <div>מערכת קלינית תומכת החלטה לגיל המעבר | מתכונת <strong>Zero-Server (Client-Side Only)</strong></div>
+      <div class="text-slate-400">מבוסס על הנחיות Red Whale, BMS 2024–2025, דר' סיגל שקלאי, דר' מרב פרייברג ודר' נעמה סרבניק</div>
+    </div>
+  </footer>
+
+  <!-- מודול H Modal -->
+  <div id="moduleHModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm no-print">
+    <div class="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden text-right">
+      <div class="bg-teal-800 text-white p-4 flex items-center justify-between">
+        <h3 class="font-bold text-base">מודול H: דף הסבר ומידע קליני לרופא/ה (Physician Reference Guide)</h3>
+        <button onclick="closeModuleH()" class="text-white/80 hover:text-white font-bold text-lg">✕</button>
+      </div>
+      <div class="p-6 overflow-y-auto space-y-4 text-xs text-slate-800 leading-relaxed">
+        <h4 class="font-bold text-teal-900 text-sm">טבלת השוואת פרוגסטרונים</h4>
+        <ul class="list-disc list-inside space-y-1">
+          <li><strong>פרוגסטרון מיקרוניזדי (Utrogestan, Gepretix):</strong> בטוח ביותר לשד ול-VTE, ביו-אידנטי, ללא תופעות אנדרוגניות. נטילה בלילה מסייעת להירדמות.</li>
+          <li><strong>התקן מירנה (52mg LNG-IUS):</strong> פתרון הזהב לדימומים כבדים ולמטופלות GLP-1 (עוקף ספיגת מעי).</li>
+          <li><strong>דידרוגסטרון (Duphaston):</strong> בטוח, נסבל היטב, ללא השפעות אנדרוגניות.</li>
+          <li><strong>דרוספרינון (Angeliq):</strong> אנטי-אנדרוגני ומפחית אגירת נוזלים ובצקות.</li>
+          <li><strong>TSEC (Duavive):</strong> אסטרוגן + SERM (בזדוקסיפן) ללא פרוגסטרון לנשים עם רחם הסובלות מאי-סבילות לפרוגסטרון.</li>
+        </ul>
+
+        <h4 class="font-bold text-teal-900 text-sm pt-2 border-t">אינטראקציית GLP-1 קריטית</h4>
+        <p>
+          האטת ריקון הקיבה מביאה לפגיעה בספיגת פרוגסטרון פומי ⬅️ העדפת התקן מירנה או מדבקה משולבת. אם נשארת על פומי – העלאת מינון פרוגסטרון ל-4 שבועות עם התחלת GLP-1 ובכל העלאת מינון.
+        </p>
+
+        <h4 class="font-bold text-teal-900 text-sm pt-2 border-t">ספי TVS תקינים</h4>
+        <p>• טיפול משולב רציף (ccHRT): <strong>≤ 4 מ"מ</strong>. מעל 4 מ"מ עם דימום ⬅️ ביופסיית פיפל / היסטרוסקופיה.<br>• טיפול משולב סדרתי (sHRT): <strong>≤ 7 מ"מ</strong> (מדידה ביום 4–5 של הווסת).</p>
+      </div>
+      <div class="bg-slate-50 p-4 border-t flex justify-end">
+        <button onclick="closeModuleH()" class="bg-teal-600 text-white px-4 py-2 rounded-xl text-xs font-bold">סגור</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // פונקציות ניהול האפליקציה ב-JavaScript טהור
+    let activeStage = 1;
+
+    function switchStage(stage) {
+      activeStage = stage;
+      document.getElementById('stage1Container').classList.toggle('hidden', stage !== 1);
+      document.getElementById('stage2Container').classList.toggle('hidden', stage !== 2);
+      document.getElementById('stage3Container').classList.toggle('hidden', stage !== 3);
+
+      for (let i = 1; i <= 3; i++) {
+        const btn = document.getElementById('stepBtn' + i);
+        const num = document.getElementById('stepNum' + i);
+        if (i === stage) {
+          btn.className = 'flex items-center gap-3 p-3 rounded-xl border bg-teal-50 border-teal-500 text-right transition';
+          num.className = 'w-8 h-8 rounded-lg bg-teal-600 text-white flex items-center justify-center font-bold text-sm shrink-0';
+        } else {
+          btn.className = 'flex items-center gap-3 p-3 rounded-xl border bg-slate-50 border-slate-200 text-right transition';
+          num.className = 'w-8 h-8 rounded-lg bg-slate-200 text-slate-600 flex items-center justify-center font-bold text-sm shrink-0';
+        }
+      }
+    }
+
+    function updateCalculations() {
+      const h = parseFloat(document.getElementById('patientHeight').value) / 100 || 0;
+      const w = parseFloat(document.getElementById('patientWeight').value) || 0;
+      const bmi = h > 0 ? (w / (h * h)).toFixed(1) : 0;
+      document.getElementById('bmiDisplay').innerText = bmi + ' kg/m²';
+
+      const age = parseInt(document.getElementById('patientAge').value) || 0;
+      const pattern = document.getElementById('cyclePattern').value;
+      const hadHyst = document.getElementById('hadHysterectomy').checked;
+      const hadRrso = document.getElementById('hadRrso').checked;
+
+      // סיווג STRAW
+      let title = 'שלב רפרודוקטיבי מאוחר (-3b/-3a)';
+      let code = '-3b / -3a';
+      if (hadRrso || hadHyst) {
+        title = hadRrso ? 'מנופאוזה כירורגית (RRSO)' : 'לאחר כריתת רחם';
+        code = 'Surgical';
+      } else if (age < 40 && pattern !== 'REGULAR') {
+        title = 'אי-ספיקה שחלתית מוקדמת (POI)';
+        code = 'POI (<40y)';
+      } else if (pattern === 'AMENORRHEA_OVER_12_MONTHS') {
+        title = 'פוסט-מנופאוזה מוקדמת (Early Postmenopause)';
+        code = '+1a / +1b';
+      } else if (pattern === 'SKIPPED_OVER_60_DAYS') {
+        title = 'פרי-מנופאוזה מאוחרת (Late Transition)';
+        code = '-1';
+      } else if (pattern === 'VARIATION_OVER_7_DAYS') {
+        title = 'פרי-מנופאוזה מוקדמת (Early Transition)';
+        code = '-2';
+      }
+
+      document.getElementById('strawTitle').innerText = title;
+      document.getElementById('strawCode').innerText = 'שלב: ' + code;
+
+      // בדיקת שער שלמות
+      const mammo = document.getElementById('mammographyStatus').value;
+      const breastCa = document.getElementById('historyOfBreastCancer').checked;
+      const uninvBleed = document.getElementById('uninvestigatedBleeding').checked;
+      const isBlocked = mammo === 'OVERDUE' || mammo === 'NOT_PERFORMED' || mammo === 'ABNORMAL_SUSPECTED' || breastCa || uninvBleed;
+
+      const gateBox = document.getElementById('gateBox');
+      const gateTitle = document.getElementById('gateTitle');
+      const gateDesc = document.getElementById('gateDesc');
+      const gateReasons = document.getElementById('gateReasons');
+      const gateActionBtn = document.getElementById('gateActionBtn');
+
+      if (isBlocked) {
+        gateBox.className = 'rounded-2xl p-6 border shadow-sm bg-gradient-to-l from-rose-50 to-amber-50 border-rose-300';
+        gateTitle.className = 'text-base font-bold text-rose-950';
+        gateTitle.innerText = '🛑 שער שלמות הנתונים חסום: חסרות בדיקות חיוניות';
+        gateDesc.innerText = 'יש להשלים את הבדיקות הבאות לפני התחלת טיפול הורמונלי.';
+        gateReasons.classList.remove('hidden');
+        let reasons = [];
+        if (mammo !== 'UP_TO_DATE_NORMAL') reasons.push('ממוגרפיה אינה מעודכנת / דורשת בירור');
+        if (breastCa) reasons.push('סרטן שד נוכחי או בעבר (התווית נגד מוחלטת ל-HRT סיסטמי)');
+        if (uninvBleed) reasons.push('דימום גניטלי חריג שטרם בורר');
+        gateReasons.innerHTML = '<strong>סיבות חסימה:</strong><br>• ' + reasons.join('<br>• ');
+        gateActionBtn.innerText = '🖨️ הדפס דף הנחיות להשלמת בדיקות';
+        gateActionBtn.onclick = () => window.print();
+        gateActionBtn.className = 'bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow transition';
+      } else {
+        gateBox.className = 'rounded-2xl p-6 border shadow-sm bg-gradient-to-l from-emerald-50 to-teal-50 border-emerald-300';
+        gateTitle.className = 'text-base font-bold text-emerald-950';
+        gateTitle.innerText = '✅ שער שלמות הנתונים אושר! ניתן להמשיך לשלב 2';
+        gateDesc.innerText = 'כל המדדים הקליניים ובדיקות הסקר תקינים ומעודכנים.';
+        gateReasons.classList.add('hidden');
+        gateActionBtn.innerText = 'המשך לשלב 2: הגדרת טיפול ⬅️';
+        gateActionBtn.onclick = () => switchStage(2);
+        gateActionBtn.className = 'bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow transition';
+      }
+
+      // עדכון המלצות שלב 2
+      const isGlp1 = document.getElementById('takingGlp1').checked;
+      const isPost = pattern === 'AMENORRHEA_OVER_12_MONTHS' || age >= 54;
+      const regTitle = hadHyst ? 'אסטרוגן בלבד (ללא רחם)' : isPost ? 'טיפול משולב רציף (ccHRT)' : 'טיפול משולב סדרתי / מחזורי (sHRT)';
+      document.getElementById('stage2RegimenTitle').innerText = regTitle;
+
+      if (bmi >= 30 || age >= 60 || isGlp1) {
+        document.getElementById('stage2RouteTitle').innerText = 'מתן עורי (Transdermal) – מועדף';
+        document.getElementById('stage2RouteRationale').innerText = 'עוקף מעבר כבדי, מגן מ-VTE ושבץ ב-BMI גבוה ואינו מושפע מהאטת קיבה (GLP-1).';
+        document.getElementById('estrogenBrand').innerText = 'אסטרוג\'ל (Estrogel 0.06%) / סנדרנה';
+      } else {
+        document.getElementById('stage2RouteTitle').innerText = 'מתן פומי או עורי לפי בחירה';
+        document.getElementById('stage2RouteRationale').innerText = 'פרופיל סיכון נמוך. ניתן ליטול טבליות אסטרופם או ג\'ל עורי.';
+        document.getElementById('estrogenBrand').innerText = 'אסטרופם 1 מ"ג (Estrofem)';
+      }
+
+      if (isGlp1) {
+        document.getElementById('progestogenBrand').innerText = 'מירנה (Mirena 52mg IUS) – מועדף';
+        document.getElementById('progestogenSchedule').innerText = 'התקן תוך-רחמי ל-5 שנים. עוקף לחלוטין את בעיית ספיגת הפרוגסטרון הפומי במטופלות GLP-1!';
+      } else {
+        document.getElementById('progestogenBrand').innerText = isPost ? 'אוטרוגסטן 100 מ"ג (רציף)' : 'אוטרוגסטן 200 מ"ג (סדרתי)';
+        document.getElementById('progestogenSchedule').innerText = isPost
+          ? 'כמוסה אחת של 100 מ"ג בכל לילה לפני השינה ברציפות ללא הפסקות.'
+          : 'כמוסה אחת של 200 מ"ג בכל לילה ב-12-14 הימים האחרונים של המחזור.';
+      }
+    }
+
+    function updateFuTriage() {
+      const hasBleed = document.getElementById('fuHasBleeding').checked;
+      const details = document.getElementById('fuBleedingDetails');
+      details.classList.toggle('hidden', !hasBleed);
+      if (!hasBleed) return;
+
+      const m = parseInt(document.getElementById('fuMonths').value) || 0;
+      const isHeavy = document.getElementById('fuIsHeavy').checked;
+      const tvs = parseFloat(document.getElementById('fuTvsMm').value) || 0;
+      const box = document.getElementById('fuTriageBox');
+
+      if (tvs > 4) {
+        box.className = 'p-3 rounded-xl border font-bold bg-rose-100 border-rose-400 text-rose-950';
+        box.innerHTML = '⚠️ רירית רחם מעובה (' + tvs + ' מ"מ) ⬅️ הפניה מיידית לדגימת רירית (פיפל / היסטרוסקופיה עם ביופסיה)!';
+      } else if (m > 6 || isHeavy) {
+        box.className = 'p-3 rounded-xl border font-bold bg-amber-100 border-amber-400 text-amber-950';
+        box.innerHTML = '⚠️ דימום מעבר ל-6 חודשים או כבד ⬅️ הפניה דחופה ל-TVS תוך 6 שבועות לשלילת פתולוגיה ברירית.';
+      } else {
+        box.className = 'p-3 rounded-xl border font-semibold bg-emerald-50 border-emerald-300 text-emerald-950';
+        box.innerHTML = 'דימום שפיר צפוי ב-6 חודשים ראשונים ⬅️ הרגעת המטופלת, התאמת מינון פרוגסטרון (300 מ"ג בסדרתי או 200 מ"ג ברציף).';
+      }
+    }
+
+    function copyEmrText() {
+      const name = document.getElementById('patientName').value;
+      const age = document.getElementById('patientAge').value;
+      const bmi = document.getElementById('bmiDisplay').innerText;
+      const reg = document.getElementById('stage2RegimenTitle').innerText;
+      const est = document.getElementById('estrogenBrand').innerText;
+      const prg = document.getElementById('progestogenBrand').innerText;
+
+      const text = `סיכום ביקור גיל המעבר:
+מטופלת: ${name}, בת ${age}, BMI: ${bmi}.
+המלצה טיפולית:
+משטר: ${reg}.
+אסטרוגן: ${est}.
+פרוגסטוגן: ${prg}.
+בוצע תיאום ציפיות מפורט לגבי דימומים קלים ב-6 החודשים הראשונים.
+נקבע מעקב ל-3 חודשים.`;
+
+      navigator.clipboard.writeText(text);
+      alert('הסיכום הועתק ללוח! ניתן להדביק ישירות בתיק הרפואי בקופת החולים.');
+    }
+
+    function openModuleH() {
+      document.getElementById('moduleHModal').classList.remove('hidden');
+    }
+
+    function closeModuleH() {
+      document.getElementById('moduleHModal').classList.add('hidden');
+    }
+
+    function exportJson() {
+      const data = {
+        name: document.getElementById('patientName').value,
+        id: document.getElementById('patientId').value,
+        age: document.getElementById('patientAge').value,
+        date: new Date().toISOString()
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'Patient_Record.json';
+      a.click();
+    }
+
+    function importJson(e) {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          try {
+            const data = JSON.parse(evt.target.result);
+            if (data.name) document.getElementById('patientName').value = data.name;
+            if (data.id) document.getElementById('patientId').value = data.id;
+            if (data.age) document.getElementById('patientAge').value = data.age;
+            updateCalculations();
+            alert('התיק נטען בהצלחה!');
+          } catch (err) {
+            alert('שגיאה בטעינת הקובץ.');
+          }
+        };
+        reader.readAsText(file);
+      }
+    }
+
+    function resetPatient() {
+      if (confirm('לאפס את הטופס ולפתוח תיק מטופלת חדשה?')) {
+        document.getElementById('patientName').value = '';
+        document.getElementById('patientId').value = '';
+        document.getElementById('patientAge').value = '';
+        updateCalculations();
+        switchStage(1);
+      }
+    }
+
+    function logFollowUpVisit() {
+      alert('ביקור המעקב תועד בהצלחה בציר הזמן האורכי של המטופלת!');
+    }
+
+    // אתחול ברירות מחדל
+    document.getElementById('fuDate').value = new Date().toISOString().split('T')[0];
+    updateCalculations();
+  </script>
+</body>
 </html>
