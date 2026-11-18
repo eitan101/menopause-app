@@ -1,116 +1,36 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { evaluateCompletenessGate } from './clinical-engine/completenessGate';
+import { createInitialRecord, normalizePatientRecord } from './clinical-engine/defaults';
+import { formulateTreatment } from './clinical-engine/treatmentEngine';
+import {
+  LongitudinalVisit,
+  PatientRecord,
+  SelectedTreatmentPlan,
+  Stage1Data
+} from './clinical-engine/types';
 import { Header } from './components/layout/Header';
 import { Stepper } from './components/layout/Stepper';
+import { ModuleHModal } from './components/modals/ModuleHModal';
+import { PrintModal } from './components/modals/PrintModal';
+import { QrModal } from './components/modals/QrModal';
 import { Stage1View } from './components/stage1/Stage1View';
 import { Stage2View } from './components/stage2/Stage2View';
 import { Stage3View } from './components/stage3/Stage3View';
-import { ModuleHModal } from './components/modals/ModuleHModal';
-import { QrModal } from './components/modals/QrModal';
-import { PrintModal } from './components/modals/PrintModal';
-import { PatientRecord, Stage1Data, LongitudinalVisit } from './clinical-engine/types';
-import { evaluateCompletenessGate } from './clinical-engine/completenessGate';
-import { formulateTreatment } from './clinical-engine/treatmentEngine';
-import { encryptData, decryptData } from './services/cryptoService';
+import { decryptData, encryptData } from './services/cryptoService';
 
-const DEFAULT_STAGE1_DATA: Stage1Data = {
-  patientId: '12345678',
-  fullName: 'שרה כהן',
-  age: 52,
-  occupation: 'הוראה',
-  weightKg: 72,
-  heightCm: 164,
-  bmi: 26.8,
-  bpSystolic: 125,
-  bpDiastolic: 80,
-  isSmoker: false,
-  alcoholUnitsPerWeek: 1,
-  nutritionQuality: 'HEALTHY',
-  exerciseRegular: true,
-
-  gravida: 3,
-  para: 3,
-  abortions: 0,
-  hadGestationalDiabetes: false,
-  hadGestationalHtn: false,
-  hadPreeclampsia: false,
-  hadPretermDelivery: false,
-  menarcheAge: 13,
-  hasPmsPmdd: true,
-  priorContraception: 'גלולות משולבות בעבר',
-  hadEndometriosis: false,
-  hadHysterectomy: false,
-  hadRrso: false,
-
-  lastPeriodDate: '2026-06-15',
-  cyclePattern: 'SKIPPED_OVER_60_DAYS',
-  bleedingIntensity: 'NORMAL',
-  monthsSinceLastPeriod: 5,
-
-  familyMenopauseAge: 51,
-  familyCvd: false,
-  familyDiabetes: false,
-  familyVte: false,
-  familyOsteoporosis: true,
-  ethnicity: 'אשכנזי',
-  brcaStatus: 'NEGATIVE',
-  lynchSyndrome: false,
-
-  vmsSeverity: 'MODERATE',
-  hasNightSweats: true,
-  hasPalpitations: false,
-  sleepDisruption: 'FREQUENT_WAKING',
-
-  hasVaginalDryness: true,
-  hasDyspareunia: true,
-  hasRecurrentUtis: false,
-  libidoChange: 'DECREASED',
-
-  hasBrainFog: true,
-  hasWordFindingDifficulty: true,
-  hasRageOrShortFuse: false,
-  hasMoodSwingsOrAnxiety: true,
-  hasJointMusculoskeletalPain: false,
-
-  mammographyStatus: 'UP_TO_DATE_NORMAL',
-  lastMammographyDate: '2026-03-10',
-  papHpvStatus: 'UP_TO_DATE_NORMAL',
-  lastPapDate: '2025-05-12',
-  cbcStatus: 'NORMAL',
-  glucoseLipidsStatus: 'NORMAL',
-  dxaStatus: 'OSTEOPENIA',
-
-  takingGlp1: false,
-  takingEnzymeInducers: false,
-  takingTamoxifenOrAIs: false,
-  takingLevothyroxine: false,
-
-  historyOfBreastCancer: false,
-  historyOfEndometrialCancer: false,
-  uninvestigatedBleeding: false,
-  activeVteOrThrombophilia: false,
-  activeLiverDisease: false,
-  recentArterialEvent: false
-};
-
-const INITIAL_RECORD: PatientRecord = {
-  version: '1.0.0',
-  lastUpdated: new Date().toISOString(),
-  activeStage: 1,
-  stage1: DEFAULT_STAGE1_DATA,
-  stage3Visits: []
-};
+const DRAFT_STORAGE_KEY = 'menopause_active_draft_v2';
 
 export const App: React.FC = () => {
   const [record, setRecord] = useState<PatientRecord>(() => {
-    const saved = localStorage.getItem('menopause_active_draft');
-    if (saved) {
+    const savedV2 = localStorage.getItem(DRAFT_STORAGE_KEY) || localStorage.getItem('menopause_active_draft');
+    if (savedV2) {
       try {
-        return JSON.parse(saved);
+        return normalizePatientRecord(JSON.parse(savedV2));
       } catch (e) {
         console.error('Failed to parse draft from localStorage', e);
       }
     }
-    return INITIAL_RECORD;
+    return createInitialRecord(false);
   });
 
   const [isModuleHOpen, setIsModuleHOpen] = useState(false);
@@ -123,57 +43,116 @@ export const App: React.FC = () => {
     type: 'PATIENT_LEAFLET'
   });
 
-  // שמירה אוטומטית כטיוטה ב-LocalStorage למניעת אובדן נתונים במרפאה
+  // שמירה אוטומטית כטיוטה מקומית ב-LocalStorage
   useEffect(() => {
-    localStorage.setItem('menopause_active_draft', JSON.stringify(record));
+    localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(record));
   }, [record]);
 
-  // בדיקת שלמות שלב 1
   const gateResult = evaluateCompletenessGate(record.stage1);
   const isStage1Complete = gateResult.isPassed;
 
   // עדכון שדות שלב 1
   const handleStage1Change = (updated: Partial<Stage1Data>) => {
     setRecord((prev) => {
-      const newStage1 = { ...prev.stage1, ...updated };
+      const nextStage1 = { ...prev.stage1, ...updated };
       return {
         ...prev,
-        stage1: newStage1,
+        stage1: nextStage1,
         lastUpdated: new Date().toISOString()
       };
     });
   };
 
-  // מעבר לשלב 2
+  // מעבר לשלב 2 וחישוב אופציות הטיפול המדורגות
   const handleProceedToStage2 = () => {
     const recs = formulateTreatment(record.stage1);
+    setRecord((prev) => {
+      const defaultSelected: SelectedTreatmentPlan = prev.selectedPlan || {
+        selectedPrimaryOptionId: recs.rankedOptions[0]?.id || '',
+        selectedGsmOptionId: recs.localAndAdjunctOptions.find((l) => l.domain === 'GSM_VAGINAL' && l.recommended)?.id,
+        includeTestosterone: false,
+        selectionRationaleTags: [],
+        selectionRationaleFreeText: '',
+        selectedAtIso: new Date().toISOString()
+      };
+      return {
+        ...prev,
+        activeStage: 2,
+        stage2: recs,
+        selectedPlan: defaultSelected,
+        lastUpdated: new Date().toISOString()
+      };
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // שמירת האופציה שנבחרה ומדוע בשלב 2
+  const handleSelectPlan = (plan: SelectedTreatmentPlan) => {
     setRecord((prev) => ({
       ...prev,
-      activeStage: 2,
-      stage2: recs,
+      stage2: formulateTreatment(prev.stage1),
+      selectedPlan: plan,
+      lastUpdated: new Date().toISOString()
+    }));
+  };
+
+  // הוספת הערה מתוארכת בשלב 2
+  const handleAddStage2Note = (text: string) => {
+    setRecord((prev) => ({
+      ...prev,
+      stage2Notes: [
+        ...prev.stage2Notes,
+        {
+          id: `s2note_${Date.now()}`,
+          createdAtIso: new Date().toISOString(),
+          stage: 2,
+          text
+        }
+      ],
+      lastUpdated: new Date().toISOString()
+    }));
+  };
+
+  const handleDeleteStage2Note = (id: string) => {
+    setRecord((prev) => ({
+      ...prev,
+      stage2Notes: prev.stage2Notes.filter((n) => n.id !== id),
       lastUpdated: new Date().toISOString()
     }));
   };
 
   // מעבר לשלב 3
   const handleProceedToStage3 = () => {
-    setRecord((prev) => ({
-      ...prev,
-      activeStage: 3,
-      lastUpdated: new Date().toISOString()
-    }));
+    setRecord((prev) => {
+      const recs = formulateTreatment(prev.stage1);
+      const ensuredPlan: SelectedTreatmentPlan = prev.selectedPlan || {
+        selectedPrimaryOptionId: recs.rankedOptions[0]?.id || '',
+        selectionRationaleTags: [],
+        selectionRationaleFreeText: '',
+        selectedAtIso: new Date().toISOString()
+      };
+      return {
+        ...prev,
+        activeStage: 3,
+        stage2: recs,
+        selectedPlan: ensuredPlan,
+        lastUpdated: new Date().toISOString()
+      };
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // הוספת ביקור מעקב לשלב 3
-  const handleAddLongitudinalVisit = (visit: LongitudinalVisit) => {
+  // הוספת ביקור מעקב בשלב 3 (ועדכון התוכנית הפעילה אם בוצעה החלפת תרופה!)
+  const handleAddLongitudinalVisit = (visit: LongitudinalVisit, switchedPlan?: SelectedTreatmentPlan) => {
     setRecord((prev) => ({
       ...prev,
+      selectedPlan: switchedPlan || prev.selectedPlan,
       stage3Visits: [...prev.stage3Visits, visit],
       lastUpdated: new Date().toISOString()
     }));
   };
 
-  // ייצוא קובץ נתונים מוצפן מקומית (Zero-Server)
+  // ייצוא קובץ מוצפן מקומית (AES-GCM 256-bit)
   const handleExportJson = async () => {
     try {
       const encryptedBase64 = await encryptData(record);
@@ -181,7 +160,7 @@ export const App: React.FC = () => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `Patient_Record_${record.stage1.patientId || 'menopause'}.json`;
+      a.download = `Menopause_Record_${record.stage1.patientId || 'patient'}.json`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
@@ -190,56 +169,48 @@ export const App: React.FC = () => {
     }
   };
 
-  // טעינת קובץ נתונים מוצפן
+  // טעינת קובץ נתונים מוצפן (או JSON גלוי לגיבוי)
   const handleImportJson = async (file: File) => {
     try {
       const text = await file.text();
-      const decrypted = await decryptData<PatientRecord>(text);
-      setRecord(decrypted);
-      alert(`תיק המטופלת (${decrypted.stage1.fullName || 'מטופלת'}) שוחזר בהצלחה!`);
+      let parsed: any;
+      try {
+        parsed = await decryptData<PatientRecord>(text.trim());
+      } catch {
+        parsed = JSON.parse(text);
+      }
+      const normalized = normalizePatientRecord(parsed);
+      if (!normalized.stage2 && normalized.activeStage >= 2) {
+        normalized.stage2 = formulateTreatment(normalized.stage1);
+      }
+      setRecord(normalized);
+      alert(`תיק המטופלת (${normalized.stage1.fullName || 'מטופלת'}) נטען בהצלחה!`);
     } catch (err) {
-      console.error('Decryption failed', err);
-      alert('שגיאה בפענוח הקובץ. אנא ודא שהקובץ תקין ומוצפן בהתאם.');
+      console.error('Import failed', err);
+      alert('שגיאה בפענוח הקובץ. אנא ודא/י שהקובץ תקין.');
     }
   };
 
-  // שחזור מקוד QR
+  // שחזור מקוד QR דחוס
   const handleRestoreFromCompressed = (data: any) => {
-    setRecord((prev) => ({
-      ...prev,
-      activeStage: (data.st as any) || 1,
-      stage1: {
-        ...prev.stage1,
-        patientId: data.id || prev.stage1.patientId,
-        fullName: data.nm || prev.stage1.fullName,
-        age: data.ag || prev.stage1.age,
-        bmi: data.bm || prev.stage1.bmi
-      }
-    }));
+    const normalized = normalizePatientRecord(data);
+    if (normalized.selectedPlan || normalized.activeStage >= 2) {
+      normalized.stage2 = formulateTreatment(normalized.stage1);
+    }
+    setRecord(normalized);
   };
 
-  // איפוס מטופלת
+  // איפוס תיק ופתיחת מטופלת חדשה ריקה
   const handleResetPatient = () => {
-    if (confirm('האם לאפס את הנתונים ולפתוח תיק מטופלת חדשה?')) {
+    if (confirm('האם לאפס את הנתונים ולפתוח תיק מטופלת חדשה ונקייה?')) {
+      localStorage.removeItem(DRAFT_STORAGE_KEY);
       localStorage.removeItem('menopause_active_draft');
-      setRecord({
-        version: '1.0.0',
-        lastUpdated: new Date().toISOString(),
-        activeStage: 1,
-        stage1: {
-          ...DEFAULT_STAGE1_DATA,
-          patientId: '',
-          fullName: '',
-          age: 0
-        },
-        stage3Visits: []
-      });
+      setRecord(createInitialRecord(true));
     }
   };
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800 font-hebrew">
-      {/* סרגל עליון */}
       <Header
         record={record}
         onOpenModuleH={() => setIsModuleHOpen(true)}
@@ -249,15 +220,19 @@ export const App: React.FC = () => {
         onResetPatient={handleResetPatient}
       />
 
-      {/* מדריך שלבים (Stepper) */}
       <Stepper
         activeStage={record.activeStage}
         isStage1Complete={isStage1Complete}
-        hasStage2Recommendations={!!record.stage2}
-        onSelectStage={(stage) => setRecord((prev) => ({ ...prev, activeStage: stage }))}
+        hasStage2Recommendations={Boolean(record.stage2 || record.selectedPlan)}
+        onSelectStage={(stage) => {
+          if (stage >= 2 && !record.stage2) {
+            handleProceedToStage2();
+          } else {
+            setRecord((prev) => ({ ...prev, activeStage: stage }));
+          }
+        }}
       />
 
-      {/* תוכן השלב הפעיל */}
       <main className="flex-1">
         {record.activeStage === 1 && (
           <Stage1View
@@ -272,7 +247,13 @@ export const App: React.FC = () => {
 
         {record.activeStage === 2 && (
           <Stage2View
+            record={record}
             stage1Data={record.stage1}
+            selectedPlan={record.selectedPlan}
+            stage2Notes={record.stage2Notes}
+            onSelectPlan={handleSelectPlan}
+            onAddStage2Note={handleAddStage2Note}
+            onDeleteStage2Note={handleDeleteStage2Note}
             onProceedToStage3={handleProceedToStage3}
             onPrintPatientLeaflet={() =>
               setPrintModalConfig({ isOpen: true, type: 'PATIENT_LEAFLET' })
@@ -282,29 +263,34 @@ export const App: React.FC = () => {
 
         {record.activeStage === 3 && (
           <Stage3View
+            record={record}
             stage1Data={record.stage1}
             stage2Recs={record.stage2}
+            selectedPlan={record.selectedPlan}
             visits={record.stage3Visits}
             onAddVisit={handleAddLongitudinalVisit}
           />
         )}
       </main>
 
-      {/* פוטר */}
       <footer className="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500 no-print">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <div>
-            מערכת קלינית תומכת החלטה לגיל המעבר | מתכונת <strong>Zero-Server (Client-Side Only)</strong>
+            מערכת קלינית תומכת החלטה לגיל המעבר | ארכיטקטורת <strong>Zero-Server (Client-Side Only)</strong>
           </div>
           <div className="text-slate-400">
-            מבוסס על הנחיות Red Whale, BMS 2024–2025, דר' סיגל שקלאי, דר' מרב פרייברג ודר' נעמה סרבניק
+            מבוסס על שאלון IMS, מחשבון AHA PREVENT™, הנחיות BMS 2024–2025, Red Whale, ד"ר שקלאי, ד"ר פרייברג וד"ר סרבניק
           </div>
         </div>
       </footer>
 
-      {/* מודאלים */}
-      <ModuleHModal isOpen={isModuleHOpen} onClose={() => setIsModuleHOpen(false)} />
-      
+      {/* מודאלים (מודול H דינמי ומותאם לנתוני המטופלת!) */}
+      <ModuleHModal
+        isOpen={isModuleHOpen}
+        onClose={() => setIsModuleHOpen(false)}
+        record={record}
+      />
+
       <QrModal
         isOpen={isQrModalOpen}
         onClose={() => setIsQrModalOpen(false)}

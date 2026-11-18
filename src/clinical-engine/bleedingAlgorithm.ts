@@ -1,115 +1,152 @@
-export interface BleedingEvaluationInput {
-  hasBleeding: boolean;
-  monthsOnTreatment: number;
+import { calculateEndometrialRisk } from './riskCalculators';
+import { evaluateContraceptionAndMirena } from './strawStaging';
+import { RegimenType, Stage1Data } from './types';
+
+export interface BleedingTriageInput {
+  stage1Data: Stage1Data;
+  regimenType: RegimenType;
+  monthsOnCurrentRegimen: number;
   hasRecentDoseChangeIn3Months: boolean;
   isHeavyOrProlonged: boolean;
-  regimenType: 'CONTINUOUS_COMBINED' | 'SEQUENTIAL_COMBINED' | 'ESTROGEN_ONLY';
-  isHighEndometrialRisk: boolean;
-  tvsThicknessMm?: number;
+  tvsEndometrialThicknessMm?: number;
+  stoppedHrt4WeeksAgoAndResolved?: boolean;
+  newlyStartedGlp1?: boolean;
 }
 
-export interface BleedingDecisionOutput {
-  triageCategory: 'BENIGN_EARLY' | 'NEEDS_OPTIMIZATION' | 'URGENT_TVS_INDICATED' | 'BIOPSY_REQUIRED';
-  categoryTitleHebrew: string;
-  urgentTvsRequired: boolean;
-  biopsyRequired: boolean;
-  urgencyTimelineHebrew?: string;
-  clinicalExplanationHebrew: string;
-  regimenAdjustmentRecommendations: string[];
+export interface BleedingTriageResult {
+  urgency: 'URGENT_2_WEEKS' | 'ROUTINE_TVS_WITHIN_6_WEEKS' | 'ADJUST_AND_OBSERVE';
+  tvsIndicated: boolean;
+  endometrialBiopsyIndicated: boolean;
+  hysteroscopyIndicated: boolean;
+  cutoffReferenceHebrew: string;
+  headline: string;
+  actionSteps: string[];
 }
 
-export function evaluateBleeding(input: BleedingEvaluationInput): BleedingDecisionOutput {
-  if (!input.hasBleeding) {
-    return {
-      triageCategory: 'BENIGN_EARLY',
-      categoryTitleHebrew: 'ללא דימומים חריגים',
-      urgentTvsRequired: false,
-      biopsyRequired: false,
-      clinicalExplanationHebrew: 'אין דיווח על דימומים חריגים או הכתמות תחת הטיפול.',
-      regimenAdjustmentRecommendations: ['המשך מעקב תקופתי שגרתי כסדרו.']
-    };
+// אלגוריתם ניהול דימום בלתי צפוי תחת HRT לפי BMS 2024 וד"ר מרב פרייברג
+export function evaluateUnscheduledBleeding(input: BleedingTriageInput): BleedingTriageResult {
+  const {
+    stage1Data,
+    regimenType,
+    monthsOnCurrentRegimen,
+    hasRecentDoseChangeIn3Months,
+    isHeavyOrProlonged,
+    tvsEndometrialThicknessMm,
+    stoppedHrt4WeeksAgoAndResolved,
+    newlyStartedGlp1
+  } = input;
+
+  const endoRisk = calculateEndometrialRisk(stage1Data);
+  const contraEval = evaluateContraceptionAndMirena(stage1Data);
+  const isContinuous = regimenType === 'CONTINUOUS_COMBINED' || regimenType === 'TSEC_OR_TIBOLONE';
+  const cutoffMm = isContinuous ? 4 : 7;
+  const cutoffReferenceHebrew = isContinuous
+    ? 'סף תקין לעובי רירית ב-TVS תחת משטר רציף (ccHRT): ≤ 4 מ"מ (BMS 2024)'
+    : 'סף תקין לעובי רירית ב-TVS תחת משטר סדרתי/ציקלי (sHRT, מיד לאחר סיום דמם הגמילה): ≤ 7 מ"מ (BMS 2024)';
+
+  const adherenceAndSecondaryChecks = [
+    'לוודא היענות מלאה למרכיב הפרוגסטוגני, מינון פרופורציונלי לגובה האסטרוגן והדבקה/מריחה סדירה.',
+    'לשלול אינטראקציות תרופתיות חדשות (זריקות GLP-1 המעכבות ספיגת פרוגסטרון פומי, משרני אנזימים), שכחת מנות, זיהום צווארי (Chlamydia/STI) ופתולוגיה צווארית בבדיקת ספקולום (משטח HPV בתוקף).'
+  ];
+
+  if (contraEval.mirenaExpiredForMhtWarning) {
+    adherenceAndSecondaryChecks.unshift(contraEval.mirenaExpiredForMhtWarning);
+  }
+  if (newlyStartedGlp1 || stage1Data.medications.takingGlp1) {
+    adherenceAndSecondaryChecks.unshift(
+      'נטילת GLP-1 פעילה: הפחתת ספיגת פרוגסטוגן פומי עלולה לגרום לדימום ולתת-הגנה על הרירית – לשקול מעבר למירנה/מדבקה משולבת או תגבור פרוגסטוגן ל-4 שבועות סביב עליית מינון.'
+    );
   }
 
-  // בדיקת עובי רירית אם בוצע TVS
-  if (input.tvsThicknessMm !== undefined && input.tvsThicknessMm > 0) {
-    const isCc = input.regimenType === 'CONTINUOUS_COMBINED';
-    const cutoffMm = isCc ? 4 : 7;
-    const isThickened = input.tvsThicknessMm > cutoffMm;
-
-    if (isThickened) {
+  // 1. אם כבר בוצע TVS ויש מדידת עובי רירית – נפעל לפי הספים המדויקים (4 מ"מ ב-ccHRT / 7 מ"מ ב-sHRT)
+  if (tvsEndometrialThicknessMm !== undefined && tvsEndometrialThicknessMm > 0) {
+    if (tvsEndometrialThicknessMm > cutoffMm) {
       return {
-        triageCategory: 'BIOPSY_REQUIRED',
-        categoryTitleHebrew: `רירית רחם מעובה ב-TVS (${input.tvsThicknessMm} מ"מ - סף עליון: ${cutoffMm} מ"מ)`,
-        urgentTvsRequired: false,
-        biopsyRequired: true,
-        urgencyTimelineHebrew: 'הפניה מיידית לדגימת רירית (פיפל / היסטרוסקופיה)',
-        clinicalExplanationHebrew: `בטיפול ${isCc ? 'משולב רציף (ccHRT)' : 'סדרתי (sHRT)'}, עובי רירית מעל ${cutoffMm} מ"מ בנוכחות דימום חריג מחייב שלילת היפרפלזיה או ממאירות באמצעות דגימה היסטולוגית (הנחיות דר' מרב פרייברג ו-BMS 2024).`,
-        regimenAdjustmentRecommendations: [
-          'הפניה דחופה לגינקולוג/ית לביצוע דגימת פיפל (Pipelle) או היסטרוסקופיה אבחנתית עם ביופסיה.',
-          'בדיקת ספירת דם (CBC) ומאגרי ברזל (פריטין) לשלילת אנמיה.',
-          'לאחר שלילת ממצא פתולוגי: שקילת התקנת התקן מירנה (52mg LNG-IUS) לדיכוי יעיל של הרירית.'
+        urgency: 'URGENT_2_WEEKS',
+        tvsIndicated: true,
+        endometrialBiopsyIndicated: true,
+        hysteroscopyIndicated: true,
+        cutoffReferenceHebrew,
+        headline: `רירית מעובה (${tvsEndometrialThicknessMm} מ"מ > סף ${cutoffMm} מ"מ): נדרשת דגימת רירית (פיפל) והיסטרוסקופיה אבחנתית!`,
+        actionSteps: [
+          `עובי הרירית (${tvsEndometrialThicknessMm} מ"מ) חורג מהסף התקין (${cutoffMm} מ"מ) עבור המשטר הנוכחי.`,
+          'הפניה דחופה לגינקולוג/ית לביצוע ביופסיית רירית הרחם (Pipelle) והיסטרוסקופיה לשלילת פוליפ/היפרפלזיה/ממאירות.',
+          ...adherenceAndSecondaryChecks
         ]
       };
     }
-  }
 
-  const isWithinFirst6Months = input.monthsOnTreatment <= 6;
-  const isAfterRecentDoseChange = input.hasRecentDoseChangeIn3Months;
-
-  // 1. קריטריונים ל-Urgent TVS תוך 6 שבועות:
-  // - דימום לאחר 6 חודשים
-  // - או דימום כבד וממושך
-  // - או סיכון גבוה לרירית הרחם
-  if (!isWithinFirst6Months && !isAfterRecentDoseChange) {
+    // עובי רירית תקין (<=4 מ"מ או <=7 מ"מ)
     return {
-      triageCategory: 'URGENT_TVS_INDICATED',
-      categoryTitleHebrew: 'דימום מעבר ל-6 חודשי טיפול (Persistent Unscheduled Bleeding)',
-      urgentTvsRequired: true,
-      biopsyRequired: false,
-      urgencyTimelineHebrew: 'ביצוע TVS תוך 6 שבועות (Urgent TVS pathway)',
-      clinicalExplanationHebrew:
-        'דימום המופיע או נמשך מעבר ל-6 חודשים מתחילת הטיפול (או מעבר ל-3 חודשים משינוי מינון) מחייב בירור הדמייתי של רירית הרחם באמצעות אולטרסאונד אגן וגינלי (TVS) לשלילת פוליפים, שרירנים, היפרפלזיה או ממאירות.',
-      regimenAdjustmentRecommendations: [
-        'הפניה ל-TVS תוך 6 שבועות עם מדידה מדויקת של עובי הרירית.',
-        input.regimenType === 'SEQUENTIAL_COMBINED'
-          ? 'בטיפול סדרתי: העלאת מינון הפרוגסטוגן (אוטרוגסטן ל-300 מ"ג ליום או הארכת ימי הנטילה ל-14-21 יום), או מעבר לטיפול רציף מעל גיל 45-54.'
-          : 'בטיפול רציף: העלאת מינון אוטרוגסטן ל-200 מ"ג ליום, או שקילת מעבר להתקן מירנה (52mg IUS) כפתרון הזהב לדימומים.'
+      urgency: isHeavyOrProlonged ? 'ROUTINE_TVS_WITHIN_6_WEEKS' : 'ADJUST_AND_OBSERVE',
+      tvsIndicated: false,
+      endometrialBiopsyIndicated: isHeavyOrProlonged && endoRisk.riskTier === 'HIGH',
+      hysteroscopyIndicated: isHeavyOrProlonged,
+      cutoffReferenceHebrew,
+      headline: `עובי רירית תקין ב-TVS (${tvsEndometrialThicknessMm} מ"מ ≤ ${cutoffMm} מ"מ) – התאמת מינון פרוגסטוגן/אסטרוגן או ניסיון הפסקה ל-4 שבועות`,
+      actionSteps: [
+        'התאמת משטר לייצוב הרירית: להעלות יחס פרוגסטוגן (למשל Utrogestan מ-100 ל-200 מ"ג, הארכת שלב הפרוגסטוגן ב-sHRT מ-12 ל-14–21 יום, מעבר לתכשיר עם NETA או התקנת מירנה 52 מ"ג).',
+        stoppedHrt4WeeksAgoAndResolved === true
+          ? 'הדימום פסק בתוך 4 שבועות מהפסקת HRT – תומך בדימום הורמונלי שפיר; ניתן לחדש במשטר מותאם או להמשיך ללא HRT לפי רצון המטופלת.'
+          : 'אפשרות אבחנתית לפי BMS 2024: הפסקה זמנית של ה-HRT ל-4 שבועות – אם הדימום פוסק לחלוטין אין צורך בבירור פולשני נוסף; אם הדימום נמשך 4 שבועות לאחר הפסקת ה-HRT או מתחדש בעוצמה מעל 6 חודשים – חובה היסטרוסקופיה ודגימת רירית!',
+        ...adherenceAndSecondaryChecks
       ]
     };
   }
 
-  if (input.isHighEndometrialRisk || input.isHeavyOrProlonged) {
+  // 2. גורמי סיכון אנדומטריאליים מוגברים (≥1 Major או ≥2 Minor) או דימום כבד/ממושך או המירנה פגה תוקף -> הפניה דחופה ל-TVS!
+  if (endoRisk.riskTier === 'HIGH' || isHeavyOrProlonged || Boolean(contraEval.mirenaExpiredForMhtWarning)) {
     return {
-      triageCategory: 'URGENT_TVS_INDICATED',
-      categoryTitleHebrew: 'דימום תחת סיכון אנדומטריאלי מוגבר או דימום כבד וממושך',
-      urgentTvsRequired: true,
-      biopsyRequired: false,
-      urgencyTimelineHebrew: 'הפניה ל-TVS תוך 6 שבועות',
-      clinicalExplanationHebrew:
-        'נוכחות גורמי סיכון מג\'וריים לרירית (כגון BMI ≥40, תסמונת לינץ\') או דימום כבד עם סיכון לאנמיה מורידים את סף הבירור ומחייבים TVS גם בתוך 6 החודשים הראשונים.',
-      regimenAdjustmentRecommendations: [
-        'ביצוע TVS לבדיקת עובי ומבנה הרירית.',
-        'התקן מירנה (52mg LNG-IUS) מהווה את טיפול הבחירה המומלץ ביותר במצבים אלו.',
-        'בדיקת CBC ופריטין להערכת מאגרי הברזל.'
+      urgency: 'URGENT_2_WEEKS',
+      tvsIndicated: true,
+      endometrialBiopsyIndicated: endoRisk.majorFactors.length >= 1 || isHeavyOrProlonged,
+      hysteroscopyIndicated: false,
+      cutoffReferenceHebrew,
+      headline: 'התוויה לבירור מהיר: אולטרסאונד נרתיקי (TVS) דחוף ובדיקת ספקולום/פיפל!',
+      actionSteps: [
+        endoRisk.riskTier === 'HIGH'
+          ? `סיכון אנדומטריאלי מוגבר לפי BMS 2024 (${[...endoRisk.majorFactors, ...endoRisk.minorFactors].join(', ')}): אין להמתין 6 חודשים – להפנות ל-TVS דחוף ולשקול דגימת רירית (פיפל).`
+          : 'דימום כבד / ממושך או תת-הגנה פרוגסטוגנית: להפנות ל-TVS בהקדם.',
+        ...adherenceAndSecondaryChecks
       ]
     };
   }
 
-  // 2. דימום ב-6 חודשים ראשונים בסיכון נמוך -> שפיר וצפוי, ניהול שמרני והתאמת טיפול
+  // 3. סיכון אנדומטריאלי נמוך: חלון ההסתגלות (6 חודשים מהתחלת HRT או 3 חודשים משינוי מינון/תכשיר)
+  const inGraceWindow =
+    monthsOnCurrentRegimen <= 6 || (hasRecentDoseChangeIn3Months && monthsOnCurrentRegimen > 0);
+
+  if (inGraceWindow) {
+    return {
+      urgency: 'ADJUST_AND_OBSERVE',
+      tvsIndicated: false,
+      endometrialBiopsyIndicated: false,
+      hysteroscopyIndicated: false,
+      cutoffReferenceHebrew,
+      headline:
+        monthsOnCurrentRegimen <= 6
+          ? `חלון הסתגלות (חודש ${monthsOnCurrentRegimen} מתוך 6 החודשים הראשונים בסיכון נמוך) – אופטימיזציית משטר ומעקב`
+          : 'דימום תוך 3 חודשים משינוי מינון/תכשיר בסיכון נמוך – אופטימיזציה ומעקב',
+      actionSteps: [
+        'לפי הנחיות BMS 2024: באישה בסיכון אנדומטריאלי נמוך עם הכתמות קלות ב-6 החודשים הראשונים להתחלת HRT (או 3 חודשים משינוי מינון), ניתן לבדוק צוואר רחם בספקולום, לוודא היענות ולבצע התאמת מינון פרוגסטוגן/אסטרוגן.',
+        'אם הדימום נמשך מעבר ל-6 חודשים מההתחלה (או מעבר ל-3 חודשים משינוי המינון) – להפנות ל-TVS לא יאוחר מ-6 שבועות!',
+        ...adherenceAndSecondaryChecks
+      ]
+    };
+  }
+
+  // 4. מעבר ל-6 חודשים (וללא שינוי מינון ב-3 החודשים האחרונים) גם בסיכון נמוך -> נדרש TVS תוך 6 שבועות!
   return {
-    triageCategory: 'BENIGN_EARLY',
-    categoryTitleHebrew: 'דימום/הכתמות ב-6 החודשים הראשונים (Early Erratic Bleeding)',
-    urgentTvsRequired: false,
-    biopsyRequired: false,
-    clinicalExplanationHebrew:
-      'הכתמות או דימומים בלתי סדירים מופיעים אצל כ-40% מהנשים ב-6 החודשים הראשונים מתחילת HRT או ב-3 החודשים שלאחר שינוי מינון. מדובר בתופעה שפירה וצפויה הנובעת מהסתגלות הרירית לגירוי ההורמונלי.',
-    regimenAdjustmentRecommendations: [
-      'הרגעה מובנית של המטופלת והסבר כי התופעה תחלוף לרוב מעצמה.',
-      'וידוא היענות ונטילה עקבית ומדויקת של הפרוגסטוגן בכל יום הנדרש.',
-      input.regimenType === 'SEQUENTIAL_COMBINED'
-        ? 'אם הדימום מציק: ניתן להאריך את ימי הפרוגסטוגן מ-12 ל-14 ימים בחודש, או להעלות מינון אוטרוגסטן ל-300 מ"ג.'
-        : 'בטיפול רציף: ניתן להעלות מינון אוטרוגסטן ל-200 מ"ג ליום, או לשקול מעבר זמני לטיפול סדרתי אם המטופלת נכנסה למנופאוזה רק לאחרונה.',
-      'אם הדימום יימשך מעבר ל-6 חודשים – יבוצע TVS.'
+    urgency: 'ROUTINE_TVS_WITHIN_6_WEEKS',
+    tvsIndicated: true,
+    endometrialBiopsyIndicated: false,
+    hysteroscopyIndicated: false,
+    cutoffReferenceHebrew,
+    headline: 'דימום חדש או נמשך מעל 6 חודשים מתחילת HRT – נדרשת הפניה ל-TVS (תוך 6 שבועות)',
+    actionSteps: [
+      `לבצע אולטרסאונד נרתיקי (TVS) להערכת עובי הרירית (${cutoffReferenceHebrew}) ובדיקת ספקולום לצוואר הרחם.`,
+      'אפשרות מקבילה לפי BMS 2024: לשקול ניסיון הפסקת HRT ל-4 שבועות אם המטופלת מעוניינת – אם הדימום נמשך לאחר 4 שבועות מההפסקה, לבצע בירור דחוף!',
+      ...adherenceAndSecondaryChecks
     ]
   };
 }

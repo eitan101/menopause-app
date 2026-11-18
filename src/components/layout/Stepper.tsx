@@ -17,22 +17,22 @@ export const Stepper: React.FC<StepperProps> = ({
   const steps = [
     {
       id: 1,
-      title: 'שלב 1: איסוף נתונים ושער שלמות',
-      subtitle: 'אנמנזה, STRAW+10, אינטראקציות ובדיקות עזר',
+      title: 'שלב 1: איסוף נתונים ושער בטיחות',
+      subtitle: 'שאלון IMS (19 פריטים), מחלות ותרופות היררכיות, משפחה, PREVENT והעדפות',
       isUnlocked: true,
       isDone: isStage1Complete
     },
     {
       id: 2,
-      title: 'שלב 2: הגדרת טיפול והמלצות',
-      subtitle: 'משטר HRT, ציר מתן עורי/פומי, ארסנל תרופות בישראל',
+      title: 'שלב 2: דירוג אפשרויות הטיפול והחלטה',
+      subtitle: 'השוואת הורמונלי ולא-הורמונלי, יתרונות/חסרונות ותיעוד הבחירה ומדוע',
       isUnlocked: isStage1Complete,
       isDone: hasStage2Recommendations
     },
     {
       id: 3,
-      title: 'שלב 3: מעקב אורכי ופתרון בעיות',
-      subtitle: 'ציר זמן ביקורים, ניהול דימומים, TVS ושינוי מינונים',
+      title: 'שלב 3: מעקב אורכי ושינוי מינונים',
+      subtitle: 'שינוי בסימפטומים, אימות רקע, תופעות לוואי, טריאז׳ דימומים ושינוי תרופתי',
       isUnlocked: isStage1Complete && hasStage2Recommendations,
       isDone: false
     }

@@ -1,33 +1,258 @@
-// Clinical Data Models & Types grounded in knowledge/summaries/INDEX.md and original clinical sources in knowledge/sources/
+// Complete Clinical Data Models & Types grounded in knowledge/summaries/01–10 and knowledge/sources/
 
 export type STRAWStage =
-  | 'LATE_REPRODUCTIVE'      // שלב רפרודוקטיבי מאוחר (-3b / -3a)
-  | 'EARLY_TRANSITION'       // פרי-מנופאוזה מוקדמת (-2)
-  | 'LATE_TRANSITION'        // פרי-מנופאוזה מאוחרת (-1)
-  | 'EARLY_POSTMENOPAUSE'    // פוסט-מנופאוזה מוקדמת (+1a, +1b, +1c - עד 6 שנים)
-  | 'LATE_POSTMENOPAUSE'     // פוסט-מנופאוזה מאוחרת (+2 - מעל 6 שנים)
-  | 'POI'                    // אי-ספיקה שחלתית מוקדמת (מתחת לגיל 40)
-  | 'EARLY_MENOPAUSE'        // מנופאוזה מוקדמת (גיל 40-44)
-  | 'SURGICAL_RRSO';         // מנופאוזה כירורגית / לאחר כריתת שחלות
+  | 'LATE_REPRODUCTIVE'              // שלב רפרודוקטיבי מאוחר (-3b / -3a)
+  | 'EARLY_TRANSITION'               // פרי-מנופאוזה מוקדמת (-2)
+  | 'LATE_TRANSITION'                // פרי-מנופאוזה מאוחרת (-1)
+  | 'EARLY_POSTMENOPAUSE'            // פוסט-מנופאוזה מוקדמת (+1a, +1b, +1c - עד 6 שנים)
+  | 'LATE_POSTMENOPAUSE'             // פוסט-מנופאוזה מאוחרת (+2 - מעל 6 שנים)
+  | 'POI'                            // אי-ספיקה שחלתית מוקדמת (מתחת לגיל 40)
+  | 'EARLY_MENOPAUSE'                // מנופאוזה מוקדמת (גיל 40-44)
+  | 'HYSTERECTOMY_OVARIES_CONSERVED' // כריתת רחם עם שימור שחלות
+  | 'SURGICAL_MENOPAUSE';            // מנופאוזה כירורגית / כריתת שחלות דו-צדדית (BSO / RRSO)
 
 export type CyclePattern =
-  | 'REGULAR'                       // סדיר
-  | 'VARIATION_OVER_7_DAYS'          // שוני מתמיד של 7 ימים ומעלה
-  | 'SKIPPED_OVER_60_DAYS'           // אל-ווסת של 60 יום ומעלה (2 מחזורים שדולגו)
-  | 'AMENORRHEA_OVER_12_MONTHS';     // היעדר ווסת מעל 12 חודשים רצופים
+  | 'REGULAR'                        // סדיר (ייתכנו תסמיני -3a)
+  | 'VARIATION_OVER_7_DAYS'          // שוני מתמיד של 7 ימים ומעלה (-2)
+  | 'SKIPPED_OVER_60_DAYS'           // אל-ווסת של 60 יום ומעלה (-1)
+  | 'AMENORRHEA_OVER_12_MONTHS';     // היעדר ווסת מעל 12 חודשים רצופים (+1 / +2)
 
-export type BleedingIntensity = 'LIGHT' | 'NORMAL' | 'HEAVY';
+export type BleedingIntensity = 'NONE' | 'LIGHT' | 'NORMAL' | 'HEAVY';
 
-export type BrcaStatus = 'NEGATIVE' | 'BRCA1' | 'BRCA2' | 'UNKNOWN' | 'NOT_TESTED';
-export type ScreeningStatus = 'UP_TO_DATE_NORMAL' | 'OVERDUE' | 'ABNORMAL_SUSPECTED' | 'NOT_PERFORMED';
-export type LabStatus = 'NORMAL' | 'ANEMIA' | 'NOT_TESTED';
+export type BrcaStatus = 'NEGATIVE' | 'BRCA1' | 'BRCA2' | 'NOT_TESTED' | 'UNKNOWN';
+export type ScreeningStatus =
+  | 'UP_TO_DATE_NORMAL'
+  | 'OVERDUE'
+  | 'ABNORMAL_SUSPECTED'
+  | 'NOT_PERFORMED'
+  | 'NOT_REQUIRED_BY_AGE';
+
+export type Score0To4 = 0 | 1 | 2 | 3 | 4;
+
+export interface SymptomScoreEntry {
+  severity: Score0To4;     // עוצמה (0-4)
+  importance: Score0To4;   // דרגת חשיבות למטופלת (0-4)
+  frequency?: Score0To4;   // תדירות (0-4 עבור פריטים 1-2 הווזומוטוריים/נוירו-וסקולריים)
+}
+
+export type SymptomAssessmentMap = Record<string, SymptomScoreEntry>;
+
+export type ContraceptionMethod =
+  | 'NONE'
+  | 'MIRENA_52MG'
+  | 'LOW_DOSE_IUS_KYLEENA'
+  | 'COPPER_IUD'
+  | 'POP_SLYND_CERAZETTE'
+  | 'CHC_PILL_PATCH_RING'
+  | 'BARRIER_OR_STERILIZATION';
+
+export interface ContraceptionData {
+  currentMethod: ContraceptionMethod;
+  mirenaInsertionDate: string; // YYYY-MM-DD לבקרת 5 שנים להגנת רירית ב-MHT
+  needsContraceptionCounseling: boolean;
+  sexuallyActiveWithPregnancyRisk: boolean;
+  notes: string;
+}
+
+// 8 קטגוריות-אב היררכיות למחלות רקע
+export interface MedicalHistoryHierarchical {
+  // 1. ממאירויות ונגעי שד/גינקולוגיה
+  hasMalignancyOrBreastHistory: boolean;
+  breastCancerHistory: boolean;
+  breastCancerReceptor: 'HR_POSITIVE' | 'HR_NEGATIVE' | 'UNKNOWN';
+  dcisOrAtypicalHyperplasia: boolean;
+  benignBreastBiopsyNoAtypia: boolean;
+  endometrialCancerHistory: 'NONE' | 'EARLY_STAGE_TREATED' | 'ADVANCED_OR_SARCOMA';
+  ovarianCancerHistory: 'NONE' | 'HORMONE_SENSITIVE_SEROUS_ENDOMETRIOID' | 'GERM_CELL_OR_MUCINOUS';
+  cervicalOrColorectalCancer: boolean;
+  malignancyNotes: string;
+
+  // 2. דימום גניטלי חריג, גינקולוגיה וסיבוכי הריון (מעצימי סיכון CV)
+  hasGynecologicalOrObstetricHistory: boolean;
+  uninvestigatedAbnormalBleeding: boolean; // PMB / IMB / PCB שטרם בורר
+  hadEndometriosis: boolean;
+  hasFibroidsOrAdenomyosis: boolean;
+  endometrialHyperplasiaHistory: 'NONE' | 'TREATED_WITHOUT_ATYPIA' | 'ATYPICAL_OR_UNRESOLVED';
+  hasPcosOrChronicAnovulation: boolean;
+  hasPmsPmddOrPostpartumDepression: boolean;
+  hadPreeclampsia: boolean;
+  hadGestationalHtn: boolean;
+  hadGestationalDiabetes: boolean;
+  hadPretermDelivery: boolean;
+  gynecologicalNotes: string;
+
+  // 3. הפרעות קרישה ופקקת ורידית (VTE)
+  hasCoagulationOrVteHistory: boolean;
+  activeAcuteVte: boolean;           // DVT / PE פעיל כעת
+  pastUnprovokedVte: boolean;        // VTE ספונטני בעבר
+  pastProvokedVte: boolean;          // VTE בעבר עם גורם מעורר חולף
+  knownThrombophilia: boolean;       // Factor V Leiden, Prothrombin, Prot C/S, AT, APLA
+  thrombophiliaDetails: string;
+  superficialThrombophlebitisOrVaricose: boolean;
+  coagulationNotes: string;
+
+  // 4. לב, כלי דם ומטבוליזם
+  hasCardiovascularOrMetabolicHistory: boolean;
+  activeOrRecentArterialEvent: boolean; // MI חריף / אנגינה לא יציבה / CVA / TIA פעיל
+  stabilizedRemotePostMi: boolean;      // מצב יציב לאחר אוטם בעבר (BMS 2024)
+  hypertensionStatus: 'NONE' | 'CONTROLLED' | 'UNCONTROLLED' | 'SEVERE_OVER_180_110';
+  diabetesStatus: 'NONE' | 'PREDIABETES' | 'DIABETES';
+  dyslipidemia: boolean;
+  hypertriglyceridemiaOver200: boolean; // TG >= 200-500 mg/dL -> עורי בלבד!
+  cardiovascularNotes: string;
+
+  // 5. כבד, מרה, כליות ומערכת העיכול
+  hasHepaticRenalGiHistory: boolean;
+  activeLiverDiseaseOrPorphyria: boolean;
+  fattyLiverOrGallstones: boolean;
+  chronicKidneyDiseaseOrSolitaryKidney: boolean; // CKD / כליה בודדת (חוסם Angeliq + קלט PREVENT)
+  malabsorptionOrBariatricSurgery: boolean;
+  hepaticRenalGiNotes: string;
+
+  // 6. נוירולוגיה ומיגרנה
+  hasNeurologicalHistory: boolean;
+  migraineWithAura: boolean;
+  migraineWithoutAura: boolean;
+  epilepsy: boolean;
+  meningiomaHistory: boolean;
+  neurologicalNotes: string;
+
+  // 7. אנדוקרינולוגיה, עצם ומחלות אוטואימוניות
+  hasEndocrineBoneAutoimmuneHistory: boolean;
+  thyroidDisorder: 'NONE' | 'HYPOTHYROID' | 'HYPERTHYROID';
+  osteoporosisOrFragilityFracture: boolean;
+  osteopenia: boolean;
+  autoimmuneDiseaseRaIbdSle: boolean;
+  sleActiveOrAplaPositive: boolean;
+  endocrineBoneNotes: string;
+
+  // 8. רגישויות ואלרגיות
+  hasAllergiesOrSensitivities: boolean;
+  peanutOrSoyAllergy: boolean;      // התווית נגד לאוטרוגסטן!
+  patchAdhesiveSensitivity: boolean; // גירוי עורי ממדבקות
+  otherDrugAllergies: string;
+
+  // שדה כללי למחלות רקע אחרות במלל חופשי לידיעת הרופא/ה
+  otherBackgroundConditionsFreeText: string;
+}
+
+// 6 קטגוריות-אב היררכיות לתרופות קבועות
+export interface MedicationHistoryHierarchical {
+  // 1. אינקרטינים (GLP-1 / GIP) וסוכרת
+  hasGlp1OrMetabolicMeds: boolean;
+  takingGlp1: boolean;
+  glp1DrugDetails: string;
+  glp1RecentInitOrDoseEscalation: boolean;
+  takingMetforminOrInsulinOrSglt2: boolean;
+
+  // 2. נוירולוגיה ואנטי-אפילפטיות
+  hasNeuroAntiepilepticMeds: boolean;
+  takingLamotrigine: boolean;        // אסטרוגן פומי מוריד רמות למוטריג'ין בעד 50%!
+  takingEnzymeInducers: boolean;     // Carbamazepine, Phenytoin, Topiramate, Rifampicin, St John's Wort
+  enzymeInducerDetails: string;
+
+  // 3. טיפול אנדוקריני / אונקולוגי
+  hasOncologicEndocrineMeds: boolean;
+  takingTamoxifen: boolean;          // חוסם MHT + חוסם Paroxetine/Fluoxetine (CYP2D6)!
+  takingAromataseInhibitors: boolean; // Letrozole, Anastrozole, Exemestane
+  takingGnrhAgonists: boolean;
+
+  // 4. בלוטת התריס וסטרואידים
+  hasThyroidOrSteroidMeds: boolean;
+  takingLevothyroxine: boolean;
+  recentTshLevel?: number;           // זיהוי TSH מדוכא (<0.4) המחקה תסמיני מנופאוזה!
+  takingSystemicCorticosteroids: boolean;
+
+  // 5. לב, ל"ד, שומנים וקרישה
+  hasCardioRenalAnticoagMeds: boolean;
+  takingAntihypertensives: boolean;
+  takingAceArbOrPotassiumSparing: boolean; // זהירות היפרקלמיה עם Angeliq
+  takingStatins: boolean;
+  takingTherapeuticAnticoagulants: boolean;
+  takingAntiplatelets: boolean;
+
+  // 6. פסיכיאטריה, שינה וכאב
+  hasPsychSleepPainMeds: boolean;
+  takingSsriOrSnri: boolean;
+  takingCyp2d6InhibitorParoxetineFluoxetine: boolean;
+  takingGabapentinOrPregabalin: boolean;
+  takingSleepMedsOrBenzos: boolean;
+
+  // מלל חופשי לתרופות ותוספי תזונה נוספים לידיעת הרופא/ה
+  otherMedicationsAndSupplementsFreeText: string;
+}
+
+export interface FamilyHistoryData {
+  familyBreastOrOvarianCancer: boolean;
+  familyCancerFirstDegreeUnder50OrMultiple: boolean;
+  familyCancerDetails: string;
+  familyEndometrialOrColorectalCancer: boolean;
+  brcaStatus: BrcaStatus;
+  lynchSyndrome: boolean;
+  familyPrematureCvd: boolean;        // גבר <55, אישה <65 בקרבה ראשונה
+  familyVteOrThrombophilia: boolean;  // מחייב מתן עורי
+  familyOsteoporosisOrHipFracture: boolean;
+  familyDiabetes: boolean;
+  familyMenopauseAge?: number;
+  notes: string;
+}
+
+export interface PriorFailedTreatment {
+  id: string;
+  treatmentKey:
+    | 'ORAL_COMBINED_NETA'     // אקטיבל / אוויאנה / נובופם
+    | 'ORAL_FEMOSTON'          // פמוסטון
+    | 'EVOREL_PATCH'           // מדבקות אוורל / אוורל קונטי
+    | 'ESTROGEL_SANDRENA'      // ג'ל אסטרוג'ל / סנדרנה
+    | 'UTROGESTAN_ORAL'        // אוטרוגסטן פומי
+    | 'MIRENA_IUS'             // מירנה
+    | 'VEOZA_NK3'              // ויוזה
+    | 'SSRI_SNRI'              // ונלפקסין / SSRI
+    | 'OTHER';
+  customName: string;
+  reasonStopped: string;
+}
+
+export interface PatientPreferencesData {
+  hormoneAttitude: 'OPEN_TO_MHT' | 'PREFERS_BODY_IDENTICAL' | 'PREFERS_NON_HORMONAL' | 'UNDECIDED';
+  preferredRoute:
+    | 'NO_PREFERENCE'
+    | 'TRANSDERMAL_GEL'
+    | 'TRANSDERMAL_PATCH'
+    | 'ORAL_TABLET'
+    | 'MIRENA_BASED'
+    | 'LOCAL_VAGINAL_ONLY';
+  bleedingPreference: 'PREFER_BLEED_FREE' | 'CYCLIC_ACCEPTABLE' | 'NO_PREFERENCE';
+  priorFailedTreatments: PriorFailedTreatment[];
+  notes: string;
+}
+
+export interface PreventCalculatorInputs {
+  isManuallyExpanded: boolean;
+  totalCholesterolMgDl?: number;
+  hdlCholesterolMgDl?: number;
+  ldlCholesterolMgDl?: number;
+  triglyceridesMgDl?: number;
+  egfrMlMin?: number;
+  serumCreatinineMgDl?: number;
+  hba1cPercent?: number;
+  uacrMgG?: number;
+}
+
+export interface TimestampedNote {
+  id: string;
+  createdAtIso: string;
+  stage: 1 | 2 | 3;
+  text: string;
+}
 
 export interface Stage1Data {
-  // דמוגרפיה ואורח חיים
+  // 1. דמוגרפיה, מדדים ואורח חיים
   patientId: string;
   fullName: string;
   age: number;
   occupation: string;
+  ethnicity: 'ASHKENAZI' | 'SEPHARDIC_MIZRAHI' | 'ETHIOPIAN' | 'ARAB' | 'MIXED_ASHKENAZI' | 'OTHER';
   weightKg: number;
   heightCm: number;
   bmi: number;
@@ -37,79 +262,59 @@ export interface Stage1Data {
   alcoholUnitsPerWeek: number;
   nutritionQuality: 'HEALTHY' | 'AVERAGE' | 'POOR';
   exerciseRegular: boolean;
+  demographicsLifestyleNotes: string;
 
-  // אנמנזה גינקולוגית ומיילדותית
+  // 2. היסטוריה גינקולוגית/מיילדותית, STRAW+10 ואמצעי מניעה נוכחיים
   gravida: number;
   para: number;
   abortions: number;
-  hadGestationalDiabetes: boolean;
-  hadGestationalHtn: boolean;
-  hadPreeclampsia: boolean;
-  hadPretermDelivery: boolean;
   menarcheAge: number;
-  hasPmsPmdd: boolean;
-  priorContraception: string;
-  hadEndometriosis: boolean;
-  hadHysterectomy: boolean;
-  hadRrso: boolean;
+  hadHysterectomy: boolean;          // כריתת רחם
+  cervixConserved?: boolean;
+  hadBsoOrRrso: boolean;             // כריתת שחלות דו-צדדית / מניעתית (BSO / RRSO)
   rrsoAge?: number;
-
-  // דפוס דימומים נוכחי
   lastPeriodDate: string;
   cyclePattern: CyclePattern;
   bleedingIntensity: BleedingIntensity;
   monthsSinceLastPeriod: number;
+  yearsOnSequentialHrt?: number;
+  contraception: ContraceptionData;
+  menstrualStageNotes: string;
 
-  // רקע משפחתי וגנטי
-  familyMenopauseAge: number;
-  familyCvd: boolean;
-  familyDiabetes: boolean;
-  familyVte: boolean;
-  familyOsteoporosis: boolean;
-  ethnicity: string;
-  brcaStatus: BrcaStatus;
-  lynchSyndrome: boolean;
+  // 3. איסוף סימפטומים מובנה (שאלון האגודה הישראלית לגיל המעבר - 19 פריטים)
+  symptoms: SymptomAssessmentMap;
+  symptomsFreeTextNotes: string;
 
-  // סריקת תסמינים מפורטת
-  vmsSeverity: 'NONE' | 'MILD' | 'MODERATE' | 'SEVERE';
-  hasNightSweats: boolean;
-  hasPalpitations: boolean;
-  sleepDisruption: 'NONE' | 'MILD' | 'FREQUENT_WAKING';
+  // 4. מחלות רקע היררכיות + מלל חופשי
+  medicalHistory: MedicalHistoryHierarchical;
 
-  hasVaginalDryness: boolean;
-  hasDyspareunia: boolean;
-  hasRecurrentUtis: boolean;
-  libidoChange: 'NORMAL' | 'DECREASED' | 'ABSENT';
+  // 5. תרופות קבועות היררכיות + מלל חופשי
+  medications: MedicationHistoryHierarchical;
 
-  hasBrainFog: boolean;
-  hasWordFindingDifficulty: boolean;
-  hasRageOrShortFuse: boolean;
-  hasMoodSwingsOrAnxiety: boolean;
-  hasJointMusculoskeletalPain: boolean;
+  // 6. מחלות במשפחה וגנטיקה + מלל חופשי
+  familyHistory: FamilyHistoryData;
 
-  // בדיקות שגרה ומעקבים
+  // 7. נתוני מעבדה למחשבון AHA PREVENT™
+  preventInputs: PreventCalculatorInputs;
+
+  // 8. העדפות המטופלת וטיפולי עבר + מלל חופשי
+  preferences: PatientPreferencesData;
+
+  // 9. בדיקות סקר ומעבדה (מותאמות גיל לפי סל הבריאות)
   mammographyStatus: ScreeningStatus;
   lastMammographyDate: string;
   papHpvStatus: ScreeningStatus;
   lastPapDate: string;
-  cbcStatus: LabStatus;
+  cbcStatus: 'NORMAL' | 'ANEMIA' | 'NOT_TESTED';
+  hemoglobinValue?: number;
+  ferritinValue?: number;
   glucoseLipidsStatus: 'NORMAL' | 'ABNORMAL' | 'NOT_TESTED';
+  lftStatus: 'NORMAL' | 'ABNORMAL' | 'NOT_TESTED';
   dxaStatus: 'NORMAL' | 'OSTEOPENIA' | 'OSTEOPOROSIS' | 'NOT_PERFORMED';
+  fitColorectalStatus: ScreeningStatus;
   fshLevel?: number;
-
-  // תרופות קבועות ואינטראקציות
-  takingGlp1: boolean;                // סמגלוטייד, טירזפטייד
-  takingEnzymeInducers: boolean;       // קרבמזפין, פניטואין, ריפמפיצין
-  takingTamoxifenOrAIs: boolean;       // טמוקסיפן, לטרוזול
-  takingLevothyroxine: boolean;        // אלטרוקסין
-  
-  // התוויות נגד מוחלטות (Contraindications)
-  historyOfBreastCancer: boolean;      // סרטן שד נוכחי או בעבר
-  historyOfEndometrialCancer: boolean; // סרטן רירית הרחם
-  uninvestigatedBleeding: boolean;     // דימום חריג שלא בורר
-  activeVteOrThrombophilia: boolean;   // פקקת ורידית או הפרעת קרישה ידועה
-  activeLiverDisease: boolean;         // מחלת כבד פעילה
-  recentArterialEvent: boolean;        // אירוע קרדיווסקולרי פעיל או לאחרונה
+  estradiolSerumLevel?: number;
+  screeningLabsNotes: string;
 }
 
 export interface EndometrialRiskAssessment {
@@ -119,89 +324,166 @@ export interface EndometrialRiskAssessment {
   rationale: string;
 }
 
+export interface PreventRiskResult {
+  isApplicable: boolean;
+  inapplicableReason?: string;
+  shouldAutoOpen: boolean;
+  autoOpenReasons: string[];
+  hasCompleteLabInputs: boolean;
+  missingInputsHebrew: string[];
+  computedEgfr?: number;
+  modelUsed: 'BASE' | 'HBA1C_ENHANCED' | 'UACR_ENHANCED';
+  risk10YearTotalCvd?: number;
+  risk10YearAscvd?: number;
+  risk10YearHeartFailure?: number;
+  risk30YearTotalCvd?: number;
+  risk30YearAscvd?: number;
+  risk30YearHeartFailure?: number;
+  mhtTrafficLight: 'GREEN' | 'YELLOW' | 'RED' | 'POST_EVENT';
+  mhtGuidanceHebrew: string;
+  bp2025GuidanceHebrew: string;
+  statin2026GuidanceHebrew: string;
+  femaleEnhancersPresent: string[];
+}
+
 export interface CompletenessGateResult {
   isPassed: boolean;
+  systemicMhtContraindicated: boolean;
   blockingReasons: string[];
+  contraindicationNotices: string[];
   warnings: string[];
+  basketRecommendations: string[];
   patientInstructions: string[];
 }
 
 export type RegimenType =
-  | 'ESTROGEN_ONLY'            // אסטרוגן בלבד (ללא רחם)
-  | 'SEQUENTIAL_COMBINED'      // משולב סדרתי / מחזורי (עם רחם בפרי-מנופאוזה)
-  | 'CONTINUOUS_COMBINED'      // משולב רציף (עם רחם במנופאוזה)
-  | 'NON_HORMONAL_ONLY'        // חלופות לא הורמונליות בלבד (התווית נגד ל-HRT)
-  | 'TSEC';                    // Duavive - אסטרוגן + בזדוקסיפן
+  | 'ESTROGEN_ONLY'
+  | 'SEQUENTIAL_COMBINED'
+  | 'CONTINUOUS_COMBINED'
+  | 'NON_HORMONAL_PRIMARY'
+  | 'TSEC_OR_TIBOLONE';
 
 export type RoutePreference =
-  | 'TRANSDERMAL_MANDATORY'    // מתן עורי חובה (בטיחות VTE / כבד)
-  | 'TRANSDERMAL_PREFERRED'    // מתן עורי מועדף (BMI, גיל, יל"ד, GLP-1)
-  | 'ORAL_ACCEPTABLE';         // מתן פומי אפשרי
+  | 'TRANSDERMAL_MANDATORY'
+  | 'TRANSDERMAL_PREFERRED'
+  | 'ORAL_OR_TRANSDERMAL'
+  | 'NON_HORMONAL_ONLY';
 
-export interface TreatmentProduct {
-  brandName: string;
-  genericName: string;
-  dosage: string;
-  schedule: string;
-  route: 'TRANSDERMAL' | 'ORAL' | 'VAGINAL' | 'INTRAUTERINE';
-  notes?: string;
+export type EstrogenDoseTier = 'ULTRA_LOW' | 'LOW' | 'STANDARD' | 'MODERATE_HIGH_PHYSIOLOGIC';
+
+export interface TreatmentOptionCard {
+  id: string;
+  category: 'HORMONAL_SYSTEMIC' | 'NON_HORMONAL_SYSTEMIC';
+  rankScore: number; // 0-100 לדירוג מותאם אישית
+  suitabilityBadge: 'RECOMMENDED_TOP' | 'GOOD_ALTERNATIVE' | 'CONDITIONAL' | 'CONTRAINDICATED_FOR_PATIENT';
+  titleHebrew: string;
+  subtitleHebrew: string;
+  routeLabelHebrew: string;
+  regimenLabelHebrew: string;
+  israeliProductsSummary: {
+    primaryAgent: string;
+    secondaryProgestogenOrMonitor?: string;
+    scheduleHebrew: string;
+  };
+  prosHebrew: string[];
+  consHebrew: string[];
+  tailoredMatchReasons: string[];
+  monitoringNotesHebrew?: string;
+}
+
+export interface LocalOrAdjunctOption {
+  id: string;
+  domain: 'GSM_VAGINAL' | 'HSDD_TESTOSTERONE';
+  recommended: boolean;
+  titleHebrew: string;
+  brandAndDoseHebrew: string;
+  scheduleHebrew: string;
+  prosHebrew: string[];
+  cautionsHebrew: string[];
+}
+
+export interface SelectedTreatmentPlan {
+  selectedPrimaryOptionId: string;
+  selectedGsmOptionId?: string;
+  includeTestosterone?: boolean;
+  selectionRationaleTags: string[];
+  selectionRationaleFreeText: string;
+  selectedAtIso: string;
+  customRegimenOverrideText?: string;
 }
 
 export interface Stage2Recommendations {
   regimenType: RegimenType;
   regimenHebrewTitle: string;
+  estrogenDoseTier: EstrogenDoseTier;
+  estrogenDoseTierReasonHebrew: string;
   routePreference: RoutePreference;
   routeRationale: string[];
-  estrogenOption?: TreatmentProduct;
-  progestogenOption?: TreatmentProduct;
-  localGsmOption?: TreatmentProduct;
-  testosteroneOption?: TreatmentProduct;
-  nonHormonalAlternatives: string[];
+  rankedOptions: TreatmentOptionCard[];
+  localAndAdjunctOptions: LocalOrAdjunctOption[];
   patientExpectationPoints: string[];
   followUpIntervalMonths: number;
   emrSummaryText: string;
 }
 
+export type FollowUpMedicationAction =
+  | 'CONTINUE_SAME'
+  | 'ESCALATE_DOSE'
+  | 'REDUCE_DOSE'
+  | 'SWITCH_DRUG_OR_ROUTE'
+  | 'ADD_LOCAL_TREATMENT'
+  | 'TAPER_OR_STOP';
+
 export interface LongitudinalVisit {
   visitId: string;
   visitDate: string;
+  timepointLabel: '3_MONTHS' | '6_MONTHS' | '12_MONTHS' | 'OTHER';
   monthsSinceStart: number;
-  currentRegimen: string;
-  currentEstrogenDose: string;
-  currentProgestogenDose: string;
-  
-  // שינוי בתסמינים
-  symptomVmsChange: 'RESOLVED' | 'IMPROVED' | 'NO_CHANGE' | 'WORSENED';
-  symptomGsmChange: 'RESOLVED' | 'IMPROVED' | 'NO_CHANGE' | 'WORSENED';
-  symptomMoodChange: 'RESOLVED' | 'IMPROVED' | 'NO_CHANGE' | 'WORSENED';
-  
-  // תופעות לוואי
-  sideEffectMastalgia: boolean;
-  sideEffectDrowsiness: boolean;
-  sideEffectMoodOrAcne: boolean;
-  sideEffectNauseaOrBloat: boolean;
 
-  // דימומים חדשים
-  hasNewBleeding: boolean;
-  bleedingOnsetDaysAgo?: number;
-  isBleedingHeavyOrProlonged: boolean;
-  isWithinFirst6Months: boolean;
-  hasRecentDoseChangeIn3Months: boolean;
+  // הטיפול שהמטופלת נטלה בכניסה לביקור
+  evaluatedOptionId?: string;
+  currentRegimenSummary: string;
 
-  // מדדים מעודכנים
-  updatedBmi?: number;
+  // 1. הערכת תסמינים חוזרת (IMS 19-item follow-up)
+  followUpSymptoms: SymptomAssessmentMap;
+  symptomSummaryDeltaText: string;
+
+  // 2. אימות שינויים ברקע הרפואי, במדדים ובתרופות
+  medicalBackgroundChecked: boolean;
+  medicalBackgroundChanged: boolean;
+  backgroundChangeDetails: string;
   updatedBpSystolic?: number;
   updatedBpDiastolic?: number;
+  updatedWeightKg?: number;
+  updatedBmi?: number;
   newlyStartedGlp1: boolean;
+  newlyStartedInteractingMed: string;
+  newContraindicationEmerged?: boolean;
+  veozaAltAstNormal?: 'NOT_APPLICABLE' | 'NORMAL' | 'ELEVATED_UNDER_3X' | 'CRITICAL_OVER_3X';
 
-  // תוצאות מנוע פתרון הבעיות
+  // 3. תופעות לוואי ספציפיות לטיפול שניתן + דימומים
+  reportedSideEffectIds: string[];
+  sideEffectsFreeText: string;
+  hasNewBleeding: boolean;
+  isBleedingHeavyOrProlonged: boolean;
+  hasRecentDoseChangeIn3Months: boolean;
+  tvsThicknessMm?: number;
+  stoppedHrt4WeeksAgoAndResolved?: boolean;
+
+  // פלט טריאז' דימומים ותופעות לוואי
   urgentTvsIndicated: boolean;
+  biopsyIndicated?: boolean;
   tvsReason?: string;
-  recommendedAction: string;
-  sideEffectPlan: string[];
-  cessationRecommended: boolean;
+  sideEffectActionPlan: string[];
+
+  // 4. שינוי תרופתי שבוצע בביקור
+  medicationAction: FollowUpMedicationAction;
+  switchedToOptionId?: string;
+  updatedRegimenText: string;
   cessationPlan?: string;
-  visitSummaryNotes: string;
+
+  // 5. הערות במלל חופשי כולל תאריך
+  timestampedNotes: TimestampedNote[];
 }
 
 export interface PatientRecord {
@@ -210,5 +492,7 @@ export interface PatientRecord {
   activeStage: 1 | 2 | 3;
   stage1: Stage1Data;
   stage2?: Stage2Recommendations;
+  selectedPlan?: SelectedTreatmentPlan;
+  stage2Notes: TimestampedNote[];
   stage3Visits: LongitudinalVisit[];
 }

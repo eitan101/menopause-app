@@ -1,148 +1,134 @@
 import React from 'react';
-import { X, Printer } from 'lucide-react';
-import { PatientRecord } from '../../clinical-engine/types';
-import { calculateStrawStage } from '../../clinical-engine/strawStaging';
+import { Printer, X } from 'lucide-react';
 import { evaluateCompletenessGate } from '../../clinical-engine/completenessGate';
+import { formulateTreatment } from '../../clinical-engine/treatmentEngine';
+import { PatientRecord } from '../../clinical-engine/types';
+import { generateEmrSummary } from '../../services/emrExportService';
 
 interface PrintModalProps {
   isOpen: boolean;
-  onClose: () => void;
   type: 'PATIENT_INSTRUCTIONS' | 'PATIENT_LEAFLET' | 'EMR_SUMMARY';
   record: PatientRecord;
+  onClose: () => void;
 }
 
-export const PrintModal: React.FC<PrintModalProps> = ({
-  isOpen,
-  onClose,
-  type,
-  record
-}) => {
+export const PrintModal: React.FC<PrintModalProps> = ({ isOpen, type, record, onClose }) => {
   if (!isOpen) return null;
 
-  const handlePrint = () => {
-    window.print();
-  };
-
   const p = record.stage1;
-  const straw = calculateStrawStage(p);
   const gate = evaluateCompletenessGate(p);
-  const now = new Date().toLocaleDateString('he-IL');
+  const recs = record.stage2 || formulateTreatment(p);
+  const chosenOption =
+    recs.rankedOptions.find((o) => o.id === record.selectedPlan?.selectedPrimaryOptionId) ||
+    recs.rankedOptions[0];
+  const gsmOption = recs.localAndAdjunctOptions.find(
+    (l) => l.id === record.selectedPlan?.selectedGsmOptionId
+  );
+
+  const today = new Date().toLocaleDateString('he-IL');
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden text-right">
-        {/* סרגל עליון - לא להדפסה */}
-        <div className="bg-teal-800 text-white p-4 flex items-center justify-between no-print">
-          <div className="flex items-center gap-2">
-            <Printer className="w-5 h-5 text-teal-200" />
-            <h3 className="font-bold text-sm">תצוגת הדפסה נקייה</h3>
-          </div>
+      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden text-right">
+        {/* כותרת בקרה (מוסתרת בהדפסה) */}
+        <div className="bg-slate-800 text-white px-6 py-4 flex items-center justify-between no-print shrink-0">
+          <h3 className="text-sm font-bold">
+            {type === 'PATIENT_INSTRUCTIONS'
+              ? 'דף הנחיות להשלמת בדיקות לקראת המשך בירור'
+              : type === 'PATIENT_LEAFLET'
+              ? 'דף הדרכה ותיאום ציפיות אישי למטופלת'
+              : 'סיכום רשומה רפואית (EMR)'}
+          </h3>
           <div className="flex items-center gap-2">
             <button
-              onClick={handlePrint}
-              className="bg-white text-teal-900 font-bold text-xs px-3 py-1.5 rounded-lg shadow hover:bg-teal-50 transition"
+              onClick={() => window.print()}
+              className="flex items-center gap-1.5 bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold px-3.5 py-1.5 rounded-lg"
             >
-              הדפס כעת
+              <Printer className="w-4 h-4" />
+              <span>הדפס / שמור PDF</span>
             </button>
-            <button onClick={onClose} className="text-white/80 hover:text-white">
+            <button onClick={onClose} className="text-white/80 hover:text-white p-1">
               <X className="w-5 h-5" />
             </button>
           </div>
         </div>
 
-        {/* תוכן הדף המודפס */}
-        <div className="p-8 overflow-y-auto space-y-6 text-slate-900 font-hebrew text-sm" id="printable-area">
-          {/* כותרת מוסדית */}
+        {/* תוכן להדפסה */}
+        <div className="p-8 overflow-y-auto space-y-5 text-sm text-slate-800 flex-1">
           <div className="border-b-2 border-teal-700 pb-3 flex justify-between items-end">
             <div>
-              <h2 className="text-xl font-bold text-teal-900">מרפאת בריאות האישה וגיל המעבר</h2>
-              <p className="text-xs text-slate-600">רפואת משפחה בקהילה</p>
+              <h1 className="text-xl font-extrabold text-teal-900">מרפאת גיל המעבר – דף מידע אישי למטופלת</h1>
+              <p className="text-xs text-slate-500 mt-0.5">
+                שם: <strong>{p.fullName || 'מטופלת'}</strong> | ת.ז: {p.patientId || '-'} | גיל: {p.age}
+              </p>
             </div>
-            <div className="text-left text-xs text-slate-500">
-              <p>תאריך: <strong>{now}</strong></p>
-            </div>
+            <div className="text-xs text-slate-500">תאריך: {today}</div>
           </div>
 
-          {/* פרטי מטופלת */}
-          <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-            <div>שם המטופלת: <strong>{p.fullName || 'מטופלת'}</strong></div>
-            <div>ת.ז/מזהה: <strong>{p.patientId || '---'}</strong></div>
-            <div>גיל: <strong>{p.age}</strong></div>
-            <div>שלב STRAW: <strong>{straw.stageCode}</strong></div>
-          </div>
-
-          {/* דף 1: הנחיות להשלמת בדיקות עזר למטופלת */}
           {type === 'PATIENT_INSTRUCTIONS' && (
             <div className="space-y-4">
-              <div className="border-r-4 border-amber-500 pr-3">
-                <h3 className="text-base font-bold text-slate-900">
-                  דף הנחיות למטופלת: השלמת בדיקות ובירורים רפואיים
-                </h3>
-                <p className="text-xs text-slate-600">
-                  לצורך התאמה בטוחה ומדויקת של טיפול הורמונלי לגיל המעבר, אנא השלימי את הבדיקות הבאות לקראת פגישתנו הבאה:
-                </p>
-              </div>
-
-              <div className="space-y-2.5">
-                {gate.patientInstructions.map((item, idx) => (
-                  <div key={idx} className="flex items-start gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
-                    <span className="w-5 h-5 rounded-md border-2 border-slate-400 mt-0.5 shrink-0" />
-                    <span className="text-xs font-semibold text-slate-800">{item}</span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="p-3 bg-teal-50 border border-teal-200 rounded-xl text-xs text-teal-900">
-                <strong>הנחיה להמשך:</strong> עם קבלת תוצאות הבדיקות, אנא קבעי תור המשך למפגש שלב 2 (הגדרת טיפול והמלצות).
-              </div>
+              <p className="font-bold text-slate-900">
+                לקראת השלמת התאמת הטיפול המדויק והבטוח ביותר עבורך, מומלץ להשלים את הבדיקות הבאות:
+              </p>
+              <ul className="list-disc pr-5 space-y-2 text-xs leading-relaxed">
+                {gate.patientInstructions.length > 0 ? (
+                  gate.patientInstructions.map((inst, idx) => <li key={idx}>{inst}</li>)
+                ) : (
+                  <li>כל בדיקות הבסיס הושלמו – ניתן להמשיך בתוכנית הטיפול.</li>
+                )}
+              </ul>
             </div>
           )}
 
-          {/* דף 2: דף תיאום ציפיות והסבר על הטיפול */}
-          {type === 'PATIENT_LEAFLET' && record.stage2 && (
-            <div className="space-y-4">
-              <div className="border-r-4 border-teal-600 pr-3">
-                <h3 className="text-base font-bold text-teal-950">
-                  דף מידע ותיאום ציפיות: תחילת הטיפול ההורמונלי בגיל המעבר
-                </h3>
-                <p className="text-xs text-slate-600">
-                  הנחיות קליניות והסבר על מה שמצופה בששת החודשים הראשונים לטיפול
-                </p>
-              </div>
-
-              <div className="p-4 bg-teal-50/60 border border-teal-200 rounded-xl space-y-2">
-                <h4 className="font-bold text-teal-950 text-xs">הטיפול שהותאם עבורך:</h4>
-                <div className="text-xs space-y-1 text-slate-800">
-                  <p>• משטר טיפול: <strong>{record.stage2.regimenHebrewTitle}</strong></p>
-                  {record.stage2.estrogenOption && (
-                    <p>• תכשיר אסטרוגן: <strong>{record.stage2.estrogenOption.brandName}</strong> ({record.stage2.estrogenOption.dosage}) - {record.stage2.estrogenOption.schedule}</p>
+          {type === 'PATIENT_LEAFLET' && (
+            <div className="space-y-4 text-xs leading-relaxed">
+              {chosenOption && (
+                <div className="p-4 rounded-2xl bg-teal-50 border border-teal-200 space-y-1.5">
+                  <div className="text-sm font-extrabold text-teal-950">תוכנית הטיפול שנבחרה יחד איתך:</div>
+                  <div className="font-bold text-slate-900">{chosenOption.titleHebrew}</div>
+                  <div>
+                    <strong>תכשיר ומינון:</strong> {chosenOption.israeliProductsSummary.primaryAgent}
+                  </div>
+                  {chosenOption.israeliProductsSummary.secondaryProgestogenOrMonitor && (
+                    <div>
+                      <strong>הגנה נלווית / מעקב:</strong>{' '}
+                      {chosenOption.israeliProductsSummary.secondaryProgestogenOrMonitor}
+                    </div>
                   )}
-                  {record.stage2.progestogenOption && (
-                    <p>• תכשיר פרוגסטוגן: <strong>{record.stage2.progestogenOption.brandName}</strong> ({record.stage2.progestogenOption.dosage}) - {record.stage2.progestogenOption.schedule}</p>
+                  <div>
+                    <strong>אופן נטילה:</strong> {chosenOption.israeliProductsSummary.scheduleHebrew}
+                  </div>
+                  {gsmOption && (
+                    <div className="pt-1 border-t border-teal-200 mt-1">
+                      <strong>טיפול מקומי משולב:</strong> {gsmOption.titleHebrew} ({gsmOption.scheduleHebrew})
+                    </div>
                   )}
                 </div>
+              )}
+
+              <div>
+                <h4 className="font-extrabold text-slate-900 mb-2">דגשים חשובים ותיאום ציפיות לחודשים הראשונים:</h4>
+                <ul className="list-disc pr-5 space-y-2">
+                  {recs.patientExpectationPoints.map((pt, idx) => (
+                    <li key={idx}>{pt}</li>
+                  ))}
+                </ul>
               </div>
 
-              <div className="space-y-2.5">
-                <h4 className="font-bold text-slate-900 text-xs">דגשים חשובים להצלחת הטיפול:</h4>
-                {record.stage2.patientExpectationPoints.map((pt, idx) => (
-                  <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800">
-                    {pt}
-                  </div>
-                ))}
-              </div>
-
-              <div className="pt-2 text-xs text-slate-500 text-center">
-                תור המעקב הבא נקבע לעוד כ-3 חודשים להערכת תגובה ומדידת לחץ דם.
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-950">
+                <strong>מתי לפנות לבדיקה רפואית לפני מועד המעקב המתוכנן (3 חודשים)?</strong>
+                <p className="mt-1">
+                  במקרה של דימום נרתיקי כבד או ממושך, גוש או שינוי חדש בשד, כאב/נפיחות חריגה בשוק הרגל, קוצר נשימה/כאב בחזה, כאב ראש חריף חדש, או (תחת טיפול בויוזה) הופעת עייפות חריגה, בחילה ממושכת, שתן כהה או הצהבת עור/עיניים.
+                </p>
               </div>
             </div>
           )}
 
-          {/* חתימת הרופאה */}
-          <div className="pt-6 border-t border-slate-200 flex justify-between items-center text-xs text-slate-600">
-            <div>חתימת וחותמת הרופאה: _____________________</div>
-            <div>מערכת CDSS לגיל המעבר (Zero-Server Architecture)</div>
-          </div>
+          {type === 'EMR_SUMMARY' && (
+            <pre className="whitespace-pre-wrap font-sans text-xs bg-slate-50 p-4 rounded-xl border border-slate-200">
+              {generateEmrSummary(record)}
+            </pre>
+          )}
         </div>
       </div>
     </div>

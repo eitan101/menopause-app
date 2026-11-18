@@ -1,380 +1,637 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
-  Pill,
-  Sparkles,
-  Shield,
-  Copy,
-  Printer,
   ArrowLeft,
-  ChevronDown,
-  Info,
   Check,
+  CheckCircle2,
+  Clock,
+  Copy,
+  FileCheck2,
+  Filter,
+  MessageSquarePlus,
+  Pill,
+  Printer,
   Search,
-  ExternalLink
+  ShieldCheck,
+  Sparkles,
+  ThumbsDown,
+  ThumbsUp,
+  Trash2
 } from 'lucide-react';
-import { Stage1Data, Stage2Recommendations } from '../../clinical-engine/types';
-import { formulateTreatment } from '../../clinical-engine/treatmentEngine';
 import { ISRAELI_DRUG_ARSENAL } from '../../clinical-engine/data/drugArsenal';
+import { formulateTreatment } from '../../clinical-engine/treatmentEngine';
+import {
+  PatientRecord,
+  SelectedTreatmentPlan,
+  Stage1Data,
+  TimestampedNote,
+  TreatmentOptionCard
+} from '../../clinical-engine/types';
+import { generateEmrSummary } from '../../services/emrExportService';
 
 interface Stage2ViewProps {
+  record: PatientRecord;
   stage1Data: Stage1Data;
+  selectedPlan?: SelectedTreatmentPlan;
+  stage2Notes: TimestampedNote[];
+  onSelectPlan: (plan: SelectedTreatmentPlan) => void;
+  onAddStage2Note: (text: string) => void;
+  onDeleteStage2Note: (id: string) => void;
   onProceedToStage3: () => void;
   onPrintPatientLeaflet: () => void;
 }
 
+const RATIONALE_QUICK_CHIPS = [
+  'פרופיל בטיחות ווסקולרי/קרישתי מיטבי (עקיפת כבד)',
+  'תואם את העדפת המטופלת לצורת המתן (ג׳ל / מדבקה / פומי)',
+  'בחירה לא-הורמונלית בשל העדפת המטופלת / התווית נגד',
+  'מענה משולב להפרעות שינה (נטילת ערב)',
+  'שילוב הגנת רירית + מניעת הריון / שליטה בדימום כבד (מירנה)',
+  'הותאם עקב כישלון או אי-סבילות בטיפול עבר',
+  'הותאם בשל אינטראקציה תרופתית (GLP-1 / למוטריג׳ין / אלרגיית סויה-בוטנים)'
+];
+
 export const Stage2View: React.FC<Stage2ViewProps> = ({
+  record,
   stage1Data,
+  selectedPlan,
+  stage2Notes,
+  onSelectPlan,
+  onAddStage2Note,
+  onDeleteStage2Note,
   onProceedToStage3,
   onPrintPatientLeaflet
 }) => {
-  const recommendations = formulateTreatment(stage1Data);
+  const recs = useMemo(() => formulateTreatment(stage1Data), [stage1Data]);
+
+  const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'HORMONAL_SYSTEMIC' | 'NON_HORMONAL_SYSTEMIC'>('ALL');
+  const [noteInput, setNoteInput] = useState('');
+  const [arsenalQuery, setArsenalQuery] = useState('');
   const [copiedEmr, setCopiedEmr] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [showArsenal, setShowArsenal] = useState(false);
+
+  // תוכנית פעילה (או ברירת מחדל לאופציה המדורגת #1)
+  const activeOptionId = selectedPlan?.selectedPrimaryOptionId || recs.rankedOptions[0]?.id || '';
+  const currentPlan: SelectedTreatmentPlan = selectedPlan || {
+    selectedPrimaryOptionId: activeOptionId,
+    selectedGsmOptionId: recs.localAndAdjunctOptions.find((l) => l.domain === 'GSM_VAGINAL' && l.recommended)?.id,
+    includeTestosterone: false,
+    selectionRationaleTags: [],
+    selectionRationaleFreeText: '',
+    selectedAtIso: new Date().toISOString()
+  };
+
+  const chosenOption = recs.rankedOptions.find((o) => o.id === currentPlan.selectedPrimaryOptionId);
+
+  const visibleOptions = recs.rankedOptions.filter((opt) =>
+    categoryFilter === 'ALL' ? true : opt.category === categoryFilter
+  );
+
+  const filteredArsenal = ISRAELI_DRUG_ARSENAL.filter(
+    (d) =>
+      !arsenalQuery.trim() ||
+      d.brandName.toLowerCase().includes(arsenalQuery.toLowerCase()) ||
+      d.hebrewName.includes(arsenalQuery) ||
+      d.activeIngredients.toLowerCase().includes(arsenalQuery.toLowerCase())
+  );
+
+  const handleChooseOption = (opt: TreatmentOptionCard) => {
+    onSelectPlan({
+      ...currentPlan,
+      selectedPrimaryOptionId: opt.id,
+      selectedAtIso: new Date().toISOString()
+    });
+  };
+
+  const toggleRationaleChip = (chip: string) => {
+    const exists = currentPlan.selectionRationaleTags.includes(chip);
+    const nextTags = exists
+      ? currentPlan.selectionRationaleTags.filter((t) => t !== chip)
+      : [...currentPlan.selectionRationaleTags, chip];
+    onSelectPlan({
+      ...currentPlan,
+      selectionRationaleTags: nextTags,
+      selectedAtIso: new Date().toISOString()
+    });
+  };
+
+  const handleAddNote = () => {
+    if (!noteInput.trim()) return;
+    onAddStage2Note(noteInput.trim());
+    setNoteInput('');
+  };
 
   const handleCopyEmr = () => {
-    navigator.clipboard.writeText(recommendations.emrSummaryText);
+    const summary = generateEmrSummary({
+      ...record,
+      stage2: recs,
+      selectedPlan: currentPlan
+    });
+    navigator.clipboard.writeText(summary);
     setCopiedEmr(true);
     setTimeout(() => setCopiedEmr(false), 2500);
   };
 
-  const filteredArsenal = ISRAELI_DRUG_ARSENAL.filter(
-    (d) =>
-      d.brandNameHebrew.includes(searchTerm) ||
-      d.brandNameEnglish.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      d.genericName.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const badgeStyles: Record<TreatmentOptionCard['suitabilityBadge'], { label: string; cls: string }> = {
+    RECOMMENDED_TOP: {
+      label: 'מומלץ בעדיפות עליונה למטופלת',
+      cls: 'bg-emerald-100 text-emerald-900 border-emerald-300'
+    },
+    GOOD_ALTERNATIVE: {
+      label: 'חלופה טיפולית מתאימה',
+      cls: 'bg-teal-50 text-teal-900 border-teal-200'
+    },
+    CONDITIONAL: {
+      label: 'אפשרי בתנאים מסוימים / קו שני',
+      cls: 'bg-amber-100 text-amber-900 border-amber-300'
+    },
+    CONTRAINDICATED_FOR_PATIENT: {
+      label: 'לא מומלץ / התווית נגד למטופלת זו',
+      cls: 'bg-rose-100 text-rose-900 border-rose-300'
+    }
+  };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-      {/* כותרת שלב 2 */}
-      <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="bg-teal-100 text-teal-800 text-xs font-bold px-2.5 py-0.5 rounded-full">
-              שלב 2 מתוך 3
-            </span>
-            <h2 className="text-xl font-bold text-slate-900">
-              הגדרת טיפול והמלצות קליניות (Treatment Formulation)
-            </h2>
-          </div>
-          <p className="text-sm text-slate-600 mt-1">
-            התאמת משטר טיפולי אישי, בחירת תכשירים מאושרים בישראל, ציר מתן עורי/פומי ותיאום ציפיות מובנה.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleCopyEmr}
-            className={`flex items-center gap-1.5 text-xs font-bold px-4 py-2.5 rounded-xl border shadow-sm transition ${
-              copiedEmr
-                ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                : 'bg-white hover:bg-slate-50 text-teal-800 border-teal-300'
-            }`}
-          >
-            {copiedEmr ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-teal-600" />}
-            <span>{copiedEmr ? 'הועתק לתיק בהצלחה!' : 'העתק לתיק רפואי (EMR)'}</span>
-          </button>
-
-          <button
-            onClick={onPrintPatientLeaflet}
-            className="flex items-center gap-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow transition"
-          >
-            <Printer className="w-4 h-4" />
-            <span>הדפס דף למטופלת</span>
-          </button>
-        </div>
-      </div>
-
-      {/* כרטיסיות ראשיות: משטר וציר מתן */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* כרטיס משטר הטיפול */}
-        <div className="bg-gradient-to-br from-teal-50/60 to-white rounded-2xl p-5 border border-teal-200 shadow-sm space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-teal-700 uppercase tracking-wider">משטר הטיפול הנבחר</span>
-            <span className="text-[11px] bg-teal-100 text-teal-800 px-2 py-0.5 rounded-full font-semibold">
-              לפי סטטוס רחם ו-STRAW+10
-            </span>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      {/* 1. כרטיס אסטרטגיה קלינית מותאמת למטופלת */}
+      <div className="bg-gradient-to-l from-teal-900 via-teal-800 to-slate-900 text-white rounded-3xl p-6 shadow-md">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 bg-white/15 px-3 py-1 rounded-full text-xs font-semibold">
+              <Sparkles className="w-4 h-4 text-teal-200" />
+              <span>שלב 2: הגדרת הטיפול, השוואת חלופות ותיעוד ההחלטה המשותפת</span>
+            </div>
+            <h2 className="text-xl font-extrabold">{recs.regimenHebrewTitle}</h2>
+            <p className="text-xs text-teal-100 leading-relaxed max-w-4xl">
+              <strong>מדרגת מינון והגנה פרופורציונלית:</strong> {recs.estrogenDoseTierReasonHebrew}
+            </p>
+            <div className="flex flex-wrap gap-2 pt-1">
+              {recs.routeRationale.map((r, i) => (
+                <span
+                  key={i}
+                  className="text-[11px] bg-black/25 border border-white/15 px-2.5 py-1 rounded-lg text-teal-50"
+                >
+                  • {r}
+                </span>
+              ))}
+            </div>
           </div>
 
-          <h3 className="text-lg font-extrabold text-teal-950">
-            {recommendations.regimenHebrewTitle}
-          </h3>
-
-          <div className="text-xs text-slate-700 space-y-1.5 leading-relaxed bg-white/80 p-3.5 rounded-xl border border-teal-100">
-            {recommendations.regimenType === 'ESTROGEN_ONLY' && (
-              <p>במטופלת לאחר כריתת רחם ללא היסטוריה של אנדומטריוזיס: אסטרוגן בלבד בטוח לחלוטין ואינו דורש תוספת פרוגסטוגן.</p>
-            )}
-            {recommendations.regimenType === 'SEQUENTIAL_COMBINED' && (
-              <p>במטופלת עם רחם בפרי-מנופאוזה: טיפול סדרתי/מחזורי (sHRT) המכיל אסטרוגן רציף ופרוגסטוגן לפחות 12–14 ימים בחודש, מגן על הרירית ומסדיר את המחזור.</p>
-            )}
-            {recommendations.regimenType === 'CONTINUOUS_COMBINED' && (
-              <p>במטופלת עם רחם בפוסט-מנופאוזה (>12 חודשי אל-ווסת או מעל גיל 54): טיפול משולב רציף (ccHRT) מגן על רירית הרחם ומעניק משטר ללא ווסת (bleed-free).</p>
-            )}
-            {recommendations.regimenType === 'NON_HORMONAL_ONLY' && (
-              <p>עקב התווית נגד לטיפול הורמונלי (רקע אונקולוגי): מיקוד בחלופות לא-הורמונליות יעילות כגון Veoza (Fezolinetant) ו-CBT.</p>
-            )}
-          </div>
-        </div>
-
-        {/* כרטיס דרך המתן (Route) */}
-        <div className="bg-gradient-to-br from-slate-50 to-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">ציר מתן האסטרוגן המומלץ</span>
-            <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
-              recommendations.routePreference.includes('MANDATORY')
-                ? 'bg-rose-100 text-rose-800'
-                : recommendations.routePreference.includes('PREFERRED')
-                ? 'bg-amber-100 text-amber-800'
-                : 'bg-emerald-100 text-emerald-800'
-            }`}>
-              {recommendations.routePreference === 'TRANSDERMAL_MANDATORY' && 'מתן עורי בלבד (חובה)'}
-              {recommendations.routePreference === 'TRANSDERMAL_PREFERRED' && 'מתן עורי מועדף (קו ראשון)'}
-              {recommendations.routePreference === 'ORAL_ACCEPTABLE' && 'מתן פומי או עורי'}
-            </span>
-          </div>
-
-          <h3 className="text-lg font-extrabold text-slate-900">
-            {recommendations.routePreference.includes('ORAL') ? 'מתן פומי או עורי לפי בחירה' : 'מתן עורי (Transdermal) – ג\'ל או מדבקות'}
-          </h3>
-
-          <div className="text-xs text-slate-700 bg-white p-3.5 rounded-xl border border-slate-200 space-y-1">
-            <p className="font-semibold text-slate-900 mb-1">נימוקים קליניים לבחירת ציר המתן:</p>
-            {recommendations.routeRationale.length > 0 ? (
-              <ul className="list-disc list-inside space-y-1 text-slate-700">
-                {recommendations.routeRationale.map((r, i) => (
-                  <li key={i}>{r}</li>
-                ))}
-              </ul>
-            ) : (
-              <p>פרופיל סיכון נמוך: גיל &lt; 60, BMI תקין, ללא יל"ד או גורמי VTE. ניתן לתת פומי או עורי.</p>
-            )}
+          <div className="flex flex-wrap gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={handleCopyEmr}
+              className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white text-xs font-bold px-4 py-2.5 rounded-xl border border-white/20 transition"
+            >
+              {copiedEmr ? <Check className="w-4 h-4 text-emerald-300" /> : <Copy className="w-4 h-4" />}
+              <span>{copiedEmr ? 'הועתק לרשומה!' : 'העתק סיכום ל-EMR'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={onPrintPatientLeaflet}
+              className="flex items-center gap-1.5 bg-white text-teal-900 hover:bg-teal-50 text-xs font-bold px-4 py-2.5 rounded-xl shadow-sm transition"
+            >
+              <Printer className="w-4 h-4" />
+              <span>דף הדרכה ותיאום ציפיות למטופלת</span>
+            </button>
           </div>
         </div>
       </div>
 
-      {/* מרשם והמלצות תרופתיות ספציפיות בישראל */}
-      <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-5">
-        <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-          <Pill className="w-5 h-5 text-teal-600" />
-          <h3 className="font-bold text-slate-900 text-base">מרשם מומלץ והנחיות נטילה (שמות מסחריים בישראל)</h3>
+      {/* 2. השוואת אופציות טיפול מדורגות (הורמונליות + לא-הורמונליות) עם יתרונות וחסרונות */}
+      <section className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+              <Filter className="w-4 h-4 text-teal-600" />
+              <span>אפשרויות טיפול מדורגות לפי התאמה אישית למטופלת (כולל הורמונלי ולא-הורמונלי)</span>
+            </h3>
+            <p className="text-xs text-slate-500">
+              הדירוג משקלל שלב STRAW+10, חשיבות תסמינים (IMS), סיכוני PREVENT/VTE/רירית, אינטראקציות, העדפות וטיפולי עבר
+            </p>
+          </div>
+
+          <div className="flex gap-1.5 bg-white p-1 rounded-xl border border-slate-200 text-xs font-bold">
+            <button
+              type="button"
+              onClick={() => setCategoryFilter('ALL')}
+              className={`px-3 py-1.5 rounded-lg transition ${
+                categoryFilter === 'ALL' ? 'bg-teal-700 text-white' : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              הכל מדורג ({recs.rankedOptions.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setCategoryFilter('HORMONAL_SYSTEMIC')}
+              className={`px-3 py-1.5 rounded-lg transition ${
+                categoryFilter === 'HORMONAL_SYSTEMIC'
+                  ? 'bg-teal-700 text-white'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              הורמונלי סיסטמי (MHT)
+            </button>
+            <button
+              type="button"
+              onClick={() => setCategoryFilter('NON_HORMONAL_SYSTEMIC')}
+              className={`px-3 py-1.5 rounded-lg transition ${
+                categoryFilter === 'NON_HORMONAL_SYSTEMIC'
+                  ? 'bg-indigo-700 text-white'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              לא-הורמונלי ({recs.rankedOptions.filter((o) => o.category === 'NON_HORMONAL_SYSTEMIC').length})
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* אסטרוגן */}
-          {recommendations.estrogenOption && (
-            <div className="p-4 rounded-xl border border-teal-200 bg-teal-50/40 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-teal-800">רכיב אסטרוגני</span>
-                <span className="text-[10px] bg-teal-200/70 text-teal-900 font-bold px-2 py-0.5 rounded">
-                  {recommendations.estrogenOption.route}
-                </span>
-              </div>
-              <h4 className="font-extrabold text-base text-teal-950">
-                {recommendations.estrogenOption.brandName}
-              </h4>
-              <p className="text-xs text-slate-600 font-medium">
-                חומר פעיל: {recommendations.estrogenOption.genericName} | מינון התחלתי: {recommendations.estrogenOption.dosage}
-              </p>
-              <div className="bg-white p-2.5 rounded-lg border border-teal-100 text-xs text-slate-800">
-                <span className="font-semibold text-teal-900">אופן נטילה: </span>
-                {recommendations.estrogenOption.schedule}
-              </div>
-              {recommendations.estrogenOption.notes && (
-                <p className="text-[11px] text-teal-800 font-medium">{recommendations.estrogenOption.notes}</p>
-              )}
-            </div>
-          )}
+          {visibleOptions.map((opt, idx) => {
+            const isSelected = currentPlan.selectedPrimaryOptionId === opt.id;
+            const badge = badgeStyles[opt.suitabilityBadge];
+            const globalRank = recs.rankedOptions.findIndex((o) => o.id === opt.id) + 1;
 
-          {/* פרוגסטוגן */}
-          {recommendations.progestogenOption && (
-            <div className="p-4 rounded-xl border border-indigo-200 bg-indigo-50/40 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-indigo-800">רכיב פרוגסטוגני להגנת הרירית</span>
-                <span className="text-[10px] bg-indigo-200/70 text-indigo-900 font-bold px-2 py-0.5 rounded">
-                  {recommendations.progestogenOption.route}
-                </span>
-              </div>
-              <h4 className="font-extrabold text-base text-indigo-950">
-                {recommendations.progestogenOption.brandName}
-              </h4>
-              <p className="text-xs text-slate-600 font-medium">
-                חומר פעיל: {recommendations.progestogenOption.genericName} | מינון: {recommendations.progestogenOption.dosage}
-              </p>
-              <div className="bg-white p-2.5 rounded-lg border border-indigo-100 text-xs text-slate-800">
-                <span className="font-semibold text-indigo-900">אופן נטילה: </span>
-                {recommendations.progestogenOption.schedule}
-              </div>
-              {recommendations.progestogenOption.notes && (
-                <p className="text-[11px] text-indigo-800 font-medium">{recommendations.progestogenOption.notes}</p>
-              )}
-            </div>
-          )}
+            return (
+              <div
+                key={opt.id}
+                className={`rounded-2xl border p-5 flex flex-col justify-between transition bg-white ${
+                  isSelected
+                    ? 'border-teal-600 ring-2 ring-teal-500/40 shadow-md'
+                    : opt.suitabilityBadge === 'CONTRAINDICATED_FOR_PATIENT'
+                    ? 'border-rose-200 opacity-80'
+                    : 'border-slate-200 hover:border-teal-300 shadow-sm'
+                }`}
+              >
+                <div className="space-y-3">
+                  {/* כותרת, דירוג ותגית התאמה */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="px-2 py-0.5 rounded-lg bg-slate-900 text-white text-xs font-extrabold">
+                        דירוג #{globalRank} (ציון {opt.rankScore})
+                      </span>
+                      <span
+                        className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
+                          opt.category === 'NON_HORMONAL_SYSTEMIC'
+                            ? 'bg-indigo-50 text-indigo-800 border-indigo-200'
+                            : 'bg-teal-50 text-teal-800 border-teal-200'
+                        }`}
+                      >
+                        {opt.category === 'NON_HORMONAL_SYSTEMIC' ? 'לא-הורמונלי' : opt.routeLabelHebrew}
+                      </span>
+                      <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${badge.cls}`}>
+                        {badge.label}
+                      </span>
+                    </div>
+                  </div>
 
-          {/* טיפול מקומי ב-GSM */}
-          {recommendations.localGsmOption && (
-            <div className="p-4 rounded-xl border border-rose-200 bg-rose-50/40 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-rose-800">טיפול מקומי באטרופיה נרתיקית (GSM)</span>
-                <span className="text-[10px] bg-rose-200/70 text-rose-900 font-bold px-2 py-0.5 rounded">
-                  {recommendations.localGsmOption.route}
-                </span>
-              </div>
-              <h4 className="font-extrabold text-base text-rose-950">
-                {recommendations.localGsmOption.brandName}
-              </h4>
-              <p className="text-xs text-slate-600 font-medium">
-                {recommendations.localGsmOption.genericName} ({recommendations.localGsmOption.dosage})
-              </p>
-              <div className="bg-white p-2.5 rounded-lg border border-rose-100 text-xs text-slate-800">
-                <span className="font-semibold text-rose-900">אופן נטילה: </span>
-                {recommendations.localGsmOption.schedule}
-              </div>
-              {recommendations.localGsmOption.notes && (
-                <p className="text-[11px] text-rose-800 font-medium">{recommendations.localGsmOption.notes}</p>
-              )}
-            </div>
-          )}
+                  <div>
+                    <h4 className="text-sm font-extrabold text-slate-900">{opt.titleHebrew}</h4>
+                    <p className="text-xs text-slate-500 mt-0.5">{opt.subtitleHebrew}</p>
+                  </div>
 
-          {/* טסטוסטרון עורי */}
-          {recommendations.testosteroneOption && (
-            <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/40 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-amber-800">טיפול משלים לירידה בחשק (HSDD)</span>
-                <span className="text-[10px] bg-amber-200/70 text-amber-900 font-bold px-2 py-0.5 rounded">
-                  עורי
-                </span>
-              </div>
-              <h4 className="font-extrabold text-base text-amber-950">
-                {recommendations.testosteroneOption.brandName}
-              </h4>
-              <p className="text-xs text-slate-600 font-medium">
-                {recommendations.testosteroneOption.genericName}
-              </p>
-              <div className="bg-white p-2.5 rounded-lg border border-amber-100 text-xs text-slate-800">
-                <span className="font-semibold text-amber-900">אופן נטילה: </span>
-                {recommendations.testosteroneOption.schedule}
-              </div>
-              <p className="text-[11px] text-amber-800 font-medium">
-                {recommendations.testosteroneOption.notes}
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* דף תיאום ציפיות למטופלת (Patient Leaflet Box) */}
-      <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-3">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <div className="flex items-center gap-2">
-            <Info className="w-5 h-5 text-teal-600" />
-            <h3 className="font-bold text-slate-900 text-base">דף תיאום ציפיות והסבר למטופלת (ששת החודשים הראשונים)</h3>
-          </div>
-          <button
-            onClick={onPrintPatientLeaflet}
-            className="text-xs text-teal-700 hover:text-teal-900 font-semibold underline flex items-center gap-1"
-          >
-            <Printer className="w-3.5 h-3.5" />
-            <span>הדפסת דף המידע</span>
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-          {recommendations.patientExpectationPoints.map((point, idx) => (
-            <div key={idx} className="flex items-start gap-2.5 bg-slate-50 p-3 rounded-xl border border-slate-200">
-              <span className="w-5 h-5 rounded-full bg-teal-100 text-teal-800 font-bold flex items-center justify-center shrink-0 text-[10px]">
-                {idx + 1}
-              </span>
-              <p className="text-slate-800 leading-relaxed">{point}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ארסנל תרופות גיל המעבר בישראל (אקורדיון לרופא/ה) */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <button
-          onClick={() => setShowArsenal(!showArsenal)}
-          className="w-full flex items-center justify-between p-5 bg-slate-50/70 hover:bg-slate-100 transition text-right"
-        >
-          <div className="flex items-center gap-2">
-            <Search className="w-5 h-5 text-teal-600" />
-            <div>
-              <h4 className="font-bold text-slate-900 text-sm">
-                ארסנל תרופות גיל המעבר הרשומות בישראל (טבלת חיפוש ומינונים)
-              </h4>
-              <p className="text-xs text-slate-500">לחץ לצפייה בכל התכשירים, דרכי המתן ומינוני השוואה</p>
-            </div>
-          </div>
-          <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${showArsenal ? 'rotate-180' : ''}`} />
-        </button>
-
-        {showArsenal && (
-          <div className="p-5 space-y-4 border-t border-slate-200">
-            <div className="max-w-md">
-              <input
-                type="text"
-                placeholder="חיפוש לפי שם מסחרי, חומר פעיל או אופן מתן..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full text-xs p-2.5 rounded-xl border border-slate-300"
-              />
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-right text-xs">
-                <thead>
-                  <tr className="bg-slate-100 text-slate-700 font-bold border-b">
-                    <th className="p-2.5">שם מסחרי בישראל</th>
-                    <th className="p-2.5">חומר פעיל</th>
-                    <th className="p-2.5">מינונים זמינים</th>
-                    <th className="p-2.5">דרך מתן</th>
-                    <th className="p-2.5">בטיחות שד</th>
-                    <th className="p-2.5">בטיחות VTE</th>
-                    <th className="p-2.5">דגשים קליניים</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredArsenal.map((drug) => (
-                    <tr key={drug.id} className="hover:bg-slate-50">
-                      <td className="p-2.5 font-bold text-slate-900">
-                        {drug.brandNameHebrew}
-                        <span className="block text-[10px] text-slate-500 font-normal">{drug.brandNameEnglish}</span>
-                      </td>
-                      <td className="p-2.5 text-slate-700">{drug.genericName}</td>
-                      <td className="p-2.5 text-slate-600">{drug.availableDoses.join(', ')}</td>
-                      <td className="p-2.5 text-slate-600">{drug.route}</td>
-                      <td className="p-2.5">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          drug.breastSafety === 'HIGH' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'
-                        }`}>
-                          {drug.breastSafety === 'HIGH' ? 'גבוהה ביותר' : 'סטנדרטית'}
+                  {/* תכשירים ומינון בישראל */}
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-1">
+                    <div>
+                      <strong className="text-slate-800">תכשיר עיקרי: </strong>
+                      <span className="text-slate-700">{opt.israeliProductsSummary.primaryAgent}</span>
+                    </div>
+                    {opt.israeliProductsSummary.secondaryProgestogenOrMonitor && (
+                      <div>
+                        <strong className="text-slate-800">הגנת רירית / ניטור נלווה: </strong>
+                        <span className="text-teal-900 font-semibold">
+                          {opt.israeliProductsSummary.secondaryProgestogenOrMonitor}
                         </span>
-                      </td>
-                      <td className="p-2.5">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          drug.vteSafety === 'SAFE' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                        }`}>
-                          {drug.vteSafety === 'SAFE' ? 'בטוח ל-VTE' : 'זהירות / פומי'}
-                        </span>
-                      </td>
-                      <td className="p-2.5 text-[11px] text-slate-600 max-w-xs">{drug.clinicalHighlightsHebrew}</td>
-                    </tr>
+                      </div>
+                    )}
+                    <div className="text-[11px] text-slate-500">
+                      <strong>משטר נטילה:</strong> {opt.israeliProductsSummary.scheduleHebrew}
+                    </div>
+                  </div>
+
+                  {/* התאמות אישיות ספציפיות למטופלת */}
+                  {opt.tailoredMatchReasons.length > 0 && (
+                    <div className="p-2.5 rounded-xl bg-teal-50/60 border border-teal-200 text-[11px] text-teal-950 space-y-1">
+                      <div className="font-bold">מדוע דורג כך עבור מטופלת זו:</div>
+                      {opt.tailoredMatchReasons.map((m, i) => (
+                        <p key={i}>✓ {m}</p>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* יתרונות וחסרונות */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-[11px]">
+                    <div className="p-2.5 rounded-xl bg-emerald-50/50 border border-emerald-200 space-y-1">
+                      <div className="font-bold text-emerald-900 flex items-center gap-1">
+                        <ThumbsUp className="w-3.5 h-3.5" />
+                        <span>יתרונות:</span>
+                      </div>
+                      {opt.prosHebrew.map((p, i) => (
+                        <p key={i} className="text-slate-700">
+                          • {p}
+                        </p>
+                      ))}
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-rose-50/40 border border-rose-200 space-y-1">
+                      <div className="font-bold text-rose-900 flex items-center gap-1">
+                        <ThumbsDown className="w-3.5 h-3.5" />
+                        <span>חסרונות / דגשים:</span>
+                      </div>
+                      {opt.consHebrew.map((c, i) => (
+                        <p key={i} className="text-slate-700">
+                          • {c}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* כפתור בחירה באופציה זו */}
+                <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between gap-2">
+                  {opt.monitoringNotesHebrew ? (
+                    <span className="text-[10px] text-slate-500 flex-1">{opt.monitoringNotesHebrew}</span>
+                  ) : (
+                    <span />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleChooseOption(opt)}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shrink-0 transition ${
+                      isSelected
+                        ? 'bg-teal-700 text-white shadow-sm'
+                        : 'bg-slate-100 hover:bg-teal-50 text-slate-800 hover:text-teal-900 border border-slate-300'
+                    }`}
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>{isSelected ? 'אופציה זו נבחרה כטיפול' : 'בחר באופציה זו'}</span>
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* 3. טיפולים מקומיים משלימים ל-GSM (יובש/שתן) וטסטוסטרון ל-HSDD */}
+      <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-3">
+        <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+          <ShieldCheck className="w-4 h-4 text-teal-600" />
+          <span>שילוב טיפול מקומי ל-GSM (יובש נרתיקי / שתן) וטסטוסטרון ל-HSDD (ניתן לשלב עם כל אופציה לעיל)</span>
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+          {recs.localAndAdjunctOptions.map((loc) => {
+            const isGsmSelected =
+              loc.domain === 'GSM_VAGINAL' && currentPlan.selectedGsmOptionId === loc.id;
+            const isTestoSelected =
+              loc.domain === 'HSDD_TESTOSTERONE' && Boolean(currentPlan.includeTestosterone);
+            const active = isGsmSelected || isTestoSelected;
+
+            return (
+              <div
+                key={loc.id}
+                className={`p-3.5 rounded-xl border flex flex-col justify-between ${
+                  active ? 'bg-teal-50/50 border-teal-500' : 'bg-slate-50/60 border-slate-200'
+                }`}
+              >
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-800">{loc.titleHebrew}</span>
+                    {loc.recommended && (
+                      <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
+                        מומלץ לפי תסמינים
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-teal-900 font-semibold">{loc.brandAndDoseHebrew}</p>
+                  <p className="text-[11px] text-slate-600">{loc.scheduleHebrew}</p>
+                  {loc.cautionsHebrew.map((c, i) => (
+                    <p key={i} className="text-[10px] text-amber-800">
+                      • {c}
+                    </p>
                   ))}
-                </tbody>
-              </table>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (loc.domain === 'GSM_VAGINAL') {
+                      onSelectPlan({
+                        ...currentPlan,
+                        selectedGsmOptionId: isGsmSelected ? undefined : loc.id,
+                        selectedAtIso: new Date().toISOString()
+                      });
+                    } else {
+                      onSelectPlan({
+                        ...currentPlan,
+                        includeTestosterone: !isTestoSelected,
+                        selectedAtIso: new Date().toISOString()
+                      });
+                    }
+                  }}
+                  className={`mt-3 py-1.5 px-3 rounded-lg font-bold text-xs border transition ${
+                    active
+                      ? 'bg-teal-700 text-white border-teal-700'
+                      : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                  }`}
+                >
+                  {active ? 'משולב בתוכנית הטיפול ✓' : 'שלב בתוכנית הטיפול'}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* 4. תיעוד האופציה שנבחרה ומדוע + הערות רופא/ה מתוארכות במלל חופשי */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <section className="lg:col-span-7 bg-white rounded-2xl border border-teal-300 shadow-sm p-5 space-y-4 text-xs">
+          <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+            <FileCheck2 className="w-5 h-5 text-teal-700" />
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">תיעוד האופציה שנבחרה ומדוע (Shared Decision-Making)</h3>
+              <p className="text-[11px] text-slate-500">
+                מתעד בתיק ובסיכום ה-EMR איזה טיפול נבחר ומה היו השיקולים הקליניים והעדפת המטופלת
+              </p>
             </div>
           </div>
-        )}
+
+          {chosenOption && (
+            <div className="p-3 rounded-xl bg-teal-50 border border-teal-200">
+              <div className="font-bold text-teal-950">
+                האופציה שנבחרה: {chosenOption.titleHebrew} ({chosenOption.routeLabelHebrew})
+              </div>
+              <div className="text-[11px] text-slate-700 mt-0.5">
+                {chosenOption.israeliProductsSummary.primaryAgent}
+                {chosenOption.israeliProductsSummary.secondaryProgestogenOrMonitor
+                  ? ` + ${chosenOption.israeliProductsSummary.secondaryProgestogenOrMonitor}`
+                  : ''}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label className="block font-bold text-slate-700 mb-2">
+              סמן/י נימוקים עיקריים לבחירת האופציה (ניתן לבחור מספר נימוקים):
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {RATIONALE_QUICK_CHIPS.map((chip) => {
+                const active = currentPlan.selectionRationaleTags.includes(chip);
+                return (
+                  <button
+                    key={chip}
+                    type="button"
+                    onClick={() => toggleRationaleChip(chip)}
+                    className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold transition ${
+                      active
+                        ? 'bg-teal-700 text-white border-teal-700'
+                        : 'bg-slate-50 text-slate-700 border-slate-300 hover:bg-slate-100'
+                    }`}
+                  >
+                    {active ? `✓ ${chip}` : chip}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <label className="block font-bold text-slate-700 mb-1">
+              נימוק חופשי לבחירת הטיפול והתאמות מינון ספציפיות (מדוע נבחרה אופציה זו?):
+            </label>
+            <textarea
+              rows={3}
+              value={currentPlan.selectionRationaleFreeText}
+              onChange={(e) =>
+                onSelectPlan({
+                  ...currentPlan,
+                  selectionRationaleFreeText: e.target.value,
+                  selectedAtIso: new Date().toISOString()
+                })
+              }
+              placeholder="למשל: הוסברו יתרונות וחסרונות פומי מול ג׳ל ומדבקה; המטופלת בחרה בג׳ל אסטרוג׳ל + אוטרוגסטן בערב בשל הפרעות שינה קשות ורצון להימנע מדבק מדבקה..."
+              className="w-full p-2.5 border border-slate-300 rounded-xl"
+            />
+          </div>
+        </section>
+
+        {/* הערות במלל חופשי בשלב 2 כולל תאריך ושעה */}
+        <section className="lg:col-span-5 bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4 text-xs">
+          <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+            <MessageSquarePlus className="w-5 h-5 text-teal-600" />
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">הערות רופא/ה במלל חופשי (כולל תיעוד תאריך)</h3>
+              <p className="text-[11px] text-slate-500">כל הערה נשמרת אוטומטית עם חותמת תאריך ושעה מדויקת</p>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <textarea
+              rows={2}
+              value={noteInput}
+              onChange={(e) => setNoteInput(e.target.value)}
+              placeholder="הוסף/י הערה קלינית לשלב הגדרת הטיפול..."
+              className="w-full p-2.5 border border-slate-300 rounded-xl"
+            />
+            <button
+              type="button"
+              onClick={handleAddNote}
+              className="w-full py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl transition"
+            >
+              שמור הערה מתוארכת
+            </button>
+          </div>
+
+          <div className="space-y-2 max-h-52 overflow-y-auto">
+            {stage2Notes.length === 0 ? (
+              <p className="text-slate-400 text-center py-4">טרם נוספו הערות מתוארכות בשלב 2.</p>
+            ) : (
+              stage2Notes.map((note) => (
+                <div
+                  key={note.id}
+                  className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-start justify-between gap-2"
+                >
+                  <div>
+                    <div className="flex items-center gap-1 text-[10px] font-bold text-teal-700 mb-0.5">
+                      <Clock className="w-3 h-3" />
+                      <span>{new Date(note.createdAtIso).toLocaleString('he-IL')}</span>
+                    </div>
+                    <p className="text-slate-800 whitespace-pre-wrap">{note.text}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onDeleteStage2Note(note.id)}
+                    className="text-slate-400 hover:text-rose-600 shrink-0"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
       </div>
 
-      {/* מעבר לשלב 3 */}
+      {/* 5. ארסנל התכשירים המלא בישראל (הורמונלי + לא-הורמונלי + מקומי) לחיפוש מהיר */}
+      <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Pill className="w-5 h-5 text-teal-600" />
+            <h3 className="text-sm font-bold text-slate-800">
+              מדריך תכשירים ומינונים זמינים בישראל (כולל חוק הפרופורציונליות וניטור כבד בויוזה)
+            </h3>
+          </div>
+          <div className="relative sm:w-72">
+            <Search className="w-4 h-4 text-slate-400 absolute right-3 top-2.5" />
+            <input
+              type="text"
+              placeholder="חפש תכשיר (למשל ויוזה, אוטרוגסטן, אסטרוג׳ל)..."
+              value={arsenalQuery}
+              onChange={(e) => setArsenalQuery(e.target.value)}
+              className="w-full pr-9 pl-3 py-1.5 text-xs border border-slate-300 rounded-xl"
+            />
+          </div>
+        </div>
+
+        <div className="overflow-x-auto max-h-80">
+          <table className="w-full text-right text-xs border-collapse">
+            <thead>
+              <tr className="bg-slate-100 text-slate-700 border-b border-slate-200">
+                <th className="p-2.5 font-bold">שם תכשיר</th>
+                <th className="p-2.5 font-bold">הרכב ומינון נטילה</th>
+                <th className="p-2.5 font-bold">יתרונות קליניים</th>
+                <th className="p-2.5 font-bold">דגשים והתוויות נגד</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredArsenal.map((drug) => (
+                <tr key={drug.id} className="hover:bg-slate-50/80">
+                  <td className="p-2.5 align-top font-bold text-slate-900 whitespace-nowrap">
+                    <div>{drug.hebrewName}</div>
+                    <div className="text-[10px] text-teal-700 font-semibold">{drug.brandName}</div>
+                  </td>
+                  <td className="p-2.5 align-top text-slate-700">
+                    <div className="font-semibold text-slate-800">{drug.activeIngredients}</div>
+                    <div className="mt-0.5">{drug.dosingSchedule}</div>
+                    {drug.proportionalTierNote && (
+                      <div className="mt-1 text-[10px] text-indigo-800 font-semibold">
+                        ⚖ {drug.proportionalTierNote}
+                      </div>
+                    )}
+                  </td>
+                  <td className="p-2.5 align-top text-slate-700">{drug.clinicalAdvantages}</td>
+                  <td className="p-2.5 align-top text-rose-900/90">{drug.cautionsAndContraindications}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* כפתור מעבר לשלב 3 */}
       <div className="flex justify-end pt-2">
         <button
+          type="button"
           onClick={onProceedToStage3}
-          className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white font-bold text-sm px-6 py-3 rounded-xl shadow-md transition"
+          className="bg-teal-700 hover:bg-teal-800 text-white font-bold text-sm px-6 py-3.5 rounded-2xl shadow-sm flex items-center gap-2 transition"
         >
-          <span>מעבר לשלב 3: מפגשי מעקב חוזרים ופתרון בעיות</span>
+          <span>שמור תוכנית נבחרת והמשך לשלב 3: מעקב אורכי ושינוי מינונים</span>
           <ArrowLeft className="w-4 h-4" />
         </button>
       </div>
