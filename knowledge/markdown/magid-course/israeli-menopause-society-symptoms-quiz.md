@@ -3,7 +3,7 @@ title: "שאלון סימפטומים גיל המעבר — Israeli Menopause So
 collection: "magid-course"
 source_file: "symptoms-quiz.pdf"
 source_path: "knowledge/sources/magid-course/symptoms-quiz.pdf"
-source_url: "https://drive.google.com/file/d/1HdvAc5b1yjtSLZMJjmAosaUYjOXdrT9j/view?usp=drive_link"
+original_download_url: "https://www.menopause.org.il/news-updates/%d7%a9%d7%90%d7%9c%d7%95%d7%9f-%d7%a1%d7%99%d7%9e%d7%a4%d7%98%d7%95%d7%9e%d7%99%d7%9d/"
 source_format: "PDF (2 identical printable form pages)"
 language: "he"
 authors_or_org: "האגודה הישראלית לגיל המעבר — The Israeli Menopause Society (IMS)"
@@ -12,8 +12,7 @@ based_on: "Menopause Rating Scale (MRS); Australian Menopause Society Modified G
 
 # שאלון סימפטומים גיל המעבר — Israeli Menopause Society (IMS) Longitudinal Symptom Questionnaire
 
-> **Layer 1 Source Reference:** [`symptoms-quiz.pdf`](../../sources/magid-course/symptoms-quiz.pdf)
-> **Original Shared Source URL:** https://drive.google.com/file/d/1HdvAc5b1yjtSLZMJjmAosaUYjOXdrT9j/view?usp=drive_link
+> **Layer 1 Source Reference:** [`symptoms-quiz.pdf`](../../sources/magid-course/symptoms-quiz.pdf) *(originally downloaded from [האגודה הישראלית לגיל המעבר — שאלון סימפטומים](https://www.menopause.org.il/news-updates/%d7%a9%d7%90%d7%9c%d7%95%d7%9f-%d7%a1%d7%99%d7%9e%d7%a4%d7%98%d7%95%d7%9e%d7%99%d7%9d/))*
 > **Collection:** Magid Institute Practical Menopause Course (`magid-course`) | **Publisher:** האגודה הישראלית לגיל המעבר (*The Israeli Menopause Society — IMS*) | **Original Format:** `PDF` (2 identical copies of the clinical form)
 
 ---
