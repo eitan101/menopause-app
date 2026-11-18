@@ -1,4 +1,4 @@
-// Clinical Data Models & Types strictly based on menopause-app-design.docx & clinical knowledge files
+// Clinical Data Models & Types grounded in knowledge/summaries/INDEX.md and original clinical sources in knowledge/sources/
 
 export type STRAWStage =
   | 'LATE_REPRODUCTIVE'      // שלב רפרודוקטיבי מאוחר (-3b / -3a)

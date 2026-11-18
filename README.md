@@ -66,24 +66,26 @@
 
 ## 🔄 מבנה זרימת העבודה הקלינית | Clinical Workflow
 
+> **מקורות קליניים ישירים:** כל כללי ההחלטה, הספים הקליניים ושדות הקלט שלהלן נגזרים ישירות מקובצי המקור בתיקיית [`knowledge/sources/`](knowledge/sources/) (ומגובים בגרסאות ה-Markdown ב-[`knowledge/markdown/`](knowledge/markdown/) ובסיכומי הנושאים ב-[`knowledge/summaries/`](knowledge/summaries/INDEX.md)).
+
 ### שלב 1: מפגש ראשון ושער שלמות הנתונים (Initial Assessment & Completeness Gate)
-* **קלט נתונים מובנה**:
+* **קלט נתונים מובנה** (*מקורות: [`אנמנזה מנפאוזה.docx`](knowledge/sources/magid-course/אנמנזה%20מנפאוזה.docx), [`4 HRT: starting, troubleshooting & stopping`](knowledge/sources/red-whale/4%20HRT_%20a%20guide%20to%20starting,%20troubleshooting%20and%20stopping.docx)*):
   * דמוגרפיה ואורח חיים: גיל, עיסוק, BMI, לחץ דם, עישון, אלכוהול, תזונה ופעילות גופנית.
-  * אנמנזה גינקולוגית ומיילדותית: נוסחה מיילדותית (G/P/Ab), סיבוכי הריון (GDM, רעלת, HTN, לידה מוקדמת), גיל מנרכה, תסמיני PMS/PMDD, היסטוריית אמצעי מניעה.
+  * אנמנזה גינקולוגית ומיילדותית: נוסחה מיילדותית (G/P/Ab), סיבוכי הריון (GDM, רעלת, HTN, לידה מוקדמת – *[`CV Risk Stratification – Cho 2023`](knowledge/sources/magid-course/WhatsApp%20Image%202026-11-09%20at%2021.20.49.jpeg)*), גיל מנרכה, תסמיני PMS/PMDD, היסטוריית אמצעי מניעה (*[`מנופאוזה אמצעי מניעה`](knowledge/sources/red-whale/מנופאוזה%20אמצעי%20מני.docx)*).
   * דפוס דימומים: FMP/LMP, סדירות ב-12 החודשים האחרונים ועוצמת דימום.
-  * רקע משפחתי וגנטי: גיל מנופאוזה במשפחה, CVD, סוכרת, VTE, אוסטאופורוזיס, בירור סקר מוטציות BRCA1/2 ו-Lynch.
-  * **סיווג STRAW+10 אוטומטי**:
+  * רקע משפחתי וגנטי: גיל מנופאוזה במשפחה, CVD, סוכרת, VTE, אוסטאופורוזיס, בירור סקר מוטציות BRCA1/2 ו-Lynch (*[`טיפול הורמונלי לנשאיות BRCA – דר' סרבניק`](knowledge/sources/magid-course/טיפול%20הורמונלי%20לנשאיות%20BRCA-%20דר%20נעמה%20סרבניק.pdf), [`HRT & Gynaecological Cancers 12`](knowledge/sources/red-whale/HRT%20and%20risk%20of%20gynaecological%20and%20other%20cancers%2012.docx)*).
+  * **סיווג STRAW+10 אוטומטי** (*מקורות: [`אבחון שלבי גיל המעבר – דר' סיגל שקלאי`](knowledge/sources/magid-course/אבחון%20שלבי%20גיל%20המעבר-%20דר_%20סיגל%20שקלאי.pdf), [`1 Approaching and diagnosing menopause`](knowledge/sources/red-whale/1%20Approaching%20and%20diagnosing%20menopause.docx), [`אבחון – Red Whale`](knowledge/sources/red-whale/אבחון-%20RED%20WHALE.docx)*):
     - Late Reproductive (-3b, -3a)
     - Early Transition (-2)
     - Late Transition (-1)
     - Early Postmenopause (+1a, +1b, +1c)
     - Late Postmenopause (+2)
-    - מצבים מיוחדים: POI (<40), מנופאוזה מוקדמת (40-44), כריתת רחם/שחלות (RRSO).
-  * סריקת תסמינים מפורטת: VMS (גלי חום, הזעות לילה), GSM (יובש, כאב ביחסי מין, זיהומים בדרכי שתן), מצב רוח/קוגניציה ("Brain Fog", דיכאון, חרדה, נדודי שינה), עצם ומפרקים.
-  * מחשבוני סיכון: SCORE2/ASCVD, סיכון ל-VTE, וסיכון לפתולוגיה ברירית הרחם.
-  * מנוע אינטראקציות תרופתיות: זיהוי GLP-1 (עיכוב ריקון קיבה ופגיעה בספיגת פרוגסטרון פומי), משרני אנזימים, טמוקסיפן, אלטירוקסין.
-  * בדיקות מעקב ובריאות האישה: ממוגרפיה, Pap/HPV, בדיקות מעבדה (כימיה, שומנים, TSH, ספירת דם), DXA/FRAX.
-* **שער שלמות הנתונים (Gate Logic)**:
+    - מצבים מיוחדים: POI (<40 – *[`ASRM/ESHRE/IMS POI 2024`](knowledge/sources/magid-course/1-s20-S0015028224023859%20%281%29_261026_194559.pdf), [`NEJM POI 2023`](knowledge/sources/magid-course/NEJMcp2116488_261026_192416.pdf)*), מנופאוזה מוקדמת (40-44), כריתת רחם/שחלות (RRSO).
+  * סריקת תסמינים מפורטת ודרגת חשיבות למטופלת (*[`שאלון סימפטומים – האגודה הישראלית לגיל המעבר`](knowledge/sources/magid-course/symptoms-quiz.pdf), [`ACOG CPG No. 13 (2026)`](knowledge/sources/magid-course/ACOG.pdf), [`2 NICE Guideline 2024`](knowledge/sources/red-whale/2%20NICE%20guideline%20on%20menopause%202024_%20practice-changing%20points.docx)*): דירוג עוצמה, תדירות ודרגת חשיבות (`0–4`) ב-6 תחומים – VMS, פסיכולוגי/קוגניטיבי ("Brain Fog", חרדה, מצב רוח), סומטי (שינה, פלפיטציות, מפרקים, גרד/פורמיקציה), אורו-גניטלי ומיניות (GSM), מטבולי ותפקוד תעסוקתי/משפחתי.
+  * מחשבוני סיכון: **AHA PREVENT™** / SCORE / ASCVD (*[`MDCalc #10491 AHA PREVENT`](knowledge/sources/magid-course/MDCalc-10491-AHA-PREVENT-Calculator.html), [`AHA PREVENT Slide`](knowledge/sources/magid-course/WhatsApp%20Image%202026-11-09%20at%2021.21.19.jpeg), [`O'Kelly 2022 CV Slide`](knowledge/sources/magid-course/WhatsApp%20Image%202026-11-09%20at%2021.20.54.jpeg)*), סיכון ל-VTE (*[`HRT and risk of VTE 8`](knowledge/sources/red-whale/HRT%20and%20risk%20of%20VTE%208.docx)*), וסיכון לפתולוגיה ברירית הרחם (*[`Problematic bleeding on HRT 11`](knowledge/sources/red-whale/Approaching%20and%20managing%20problematic%20bleeding%20on%20HRT%2011.docx), [`דימומים תחת MHT – דר' פרייברג`](knowledge/sources/magid-course/דימומים%20תחת%20MHT%20-%20דר%20מרב%20פרייברג.pptx)*).
+  * מנוע אינטראקציות תרופתיות (*[`Drug interactions with HRT 14`](knowledge/sources/red-whale/Drug%20interactions%20with%20HRT%2014.docx)*): זיהוי GLP-1 (עיכוב ריקון קיבה ופגיעה בספיגת פרוגסטרון פומי), משרני אנזימים/למוטריג'ין, טמוקסיפן, אלטירוקסין.
+  * בדיקות מעקב ובריאות האישה (*[`הנחיות הרפואה המונעת – הר"י`](knowledge/sources/magid-course/clinical_118_HealthPromotionPreventiveMedicine.pdf), [`HRT and osteoporosis 10`](knowledge/sources/red-whale/HRT%20and%20osteoporosis%2010.docx)*): ממוגרפיה, Pap/hrHPV, בדיקות מעבדה (כימיה, שומנים, TSH, ספירת דם), DXA/FRAX.
+* **שער שלמות הנתונים (Gate Logic)** (*[`אנמנזה מנפאוזה.docx`](knowledge/sources/magid-course/אנמנזה%20מנפאוזה.docx), [`הנחיות הרפואה המונעת – הר"י`](knowledge/sources/magid-course/clinical_118_HealthPromotionPreventiveMedicine.pdf), [`GEMS Overview`](knowledge/sources/red-whale/GEMS%20טייפול.pdf)*):
   * 🛑 **אם חסרים נתונים קריטיים**: המערכת עוצרת, מפיקה **דף הנחיות להשלמת בדיקות** למטופלת, ומאפשרת שמירת טיוטה.
   * ✅ **אם הנתונים שלמים ותקינים**: נפתח המעבר לשלב 2.
 
@@ -91,91 +93,91 @@
 
 ### שלב 2: מפגש הגדרת טיפול והמלצות (Treatment Formulation & Recommendations)
 * **אלגוריתם קבלת החלטות טיפוליות**:
-  * **סטטוס הרחם**:
+  * **סטטוס הרחם ומשטר הטיפול** (*[`5 HRT regimens and progestogen doses`](knowledge/sources/red-whale/5%20HRT%20regimens%20and%20progestogen%20doses.docx), [`טיפול – דר' רננה תאומים`](knowledge/sources/magid-course/טיפול%20-%20רננה.pptx), [`HRT ופרוגסטרון`](knowledge/sources/red-whale/HRT%20ופרוגסטרון.docx)*):
     - ללא רחם ⬅️ אסטרוגן בלבד (ET) (אלא אם קיימת היסטוריה של אנדומטריוזיס).
     - עם רחם בפרי-מנופאוזה ⬅️ טיפול משולב סדרתי/מחזורי (sHRT) עם ≥12–14 ימי פרוגסטוגן בחודש.
     - עם רחם במנופאוזה (מעל 12 חודשי אל-ווסת / מעל גיל 54 / מעל 5 שנים על טיפול סדרתי) ⬅️ טיפול משולב רציף (ccHRT).
-  * **בחירת ציר המתן של אסטרוגן (עורי מול פומי)**:
+  * **בחירת ציר המתן של אסטרוגן ומקבילות מינון (עורי מול פומי)** (*[`טיפול – דר' רננה תאומים`](knowledge/sources/magid-course/טיפול%20-%20רננה.pptx), [`3 Different types of HRT`](knowledge/sources/red-whale/3%20Different%20types%20of%20HRT_%20bioidentical,%20conjugated%20and%20synthetic.docx), [`HRT and risk of VTE 8`](knowledge/sources/red-whale/HRT%20and%20risk%20of%20VTE%208.docx), [`Davis 2023 Estrogen Equivalence Slide`](knowledge/sources/magid-course/WhatsApp%20Image%202026-11-09%20at%2019.36.48.jpeg)*):
     - העדפה מובהקת למתן עורי (מדבקות / ג'ל) בנשים עם BMI ≥ 30, גיל > 60, עישון, יל"ד, מיגרנות, נטילת GLP-1, או ירידה בליבידו (שמירה על רמות SHBG).
-  * **התאמת סוג הפרוגסטוגן**:
-    - פרוגסטרון מיקרוניזדי טבעי (Utrogestan, Gepretix) – בטוח ביותר לשד ול-VTE.
+  * **התאמת סוג ומינון הפרוגסטוגן** (*[`סוג הפרוגסטרון בטיפול ההורמונלי – דר' נעמה סרבניק`](knowledge/sources/magid-course/סוג%20הפרוגסטרון%20בטיפול%20ההורמונלי-%20דר%20נעמה%20סרבניק.pdf), [`Davis 2023 Progestogen Dose Slide`](knowledge/sources/magid-course/WhatsApp%20Image%202026-11-09%20at%2019.36.4.jpeg), [`HRT and breast cancer risk 7`](knowledge/sources/red-whale/HRT%20and%20breast%20cancer%20risk%207.docx), [`ACOG Israeli Options Slide`](knowledge/sources/magid-course/222.jpeg)*):
+    - פרוגסטרון מיקרוניזדי טבעי (Utrogestan) – בטוח ביותר לשד ול-VTE.
     - דידרוגסטרון (Duphaston, Femoston) – בטוח ונסבל היטב.
-    - התקן תוך-רחמי שחרור לבונורגסטרל 52 מ"ג (Mirena) – פתרון זהב לדימומים כבדים ולמטופלות GLP-1.
+    - התקן תוך-רחמי שחרור לבונורגסטרל 52 מ"ג (Mirena, עד 5 שנים להגנת רירית) – פתרון זהב לדימומים כבדים, אמצעי מניעה ולמטופלות GLP-1.
     - דרוספרינון (Angeliq, Slynd) – אנטי-אנדרוגני ומפחית אגירת נוזלים.
-    - NETA (Evorel Conti, Activelle) – הגנה ובניית עצם מעולה, אך בעל השפעה אנדרוגנית.
+    - NETA (Evorel Conti, Activelle, Eviana) – הגנה ובניית עצם מעולה, אך בעל השפעה אנדרוגנית.
     - TSEC (Duavive) – אסטרוגן מצומד + בזדוקסיפן לנשים עם אי-סבילות לפרוגסטרון.
   * **אוכלוסיות מיוחדות**:
-    - נשאיות BRCA1/2 לאחר RRSO – טיפול במינונים הולמים עד גיל 52 לפחות (בהיעדר היסטוריה אישית של סרטן שד).
-    - מטופלות לאחר אוטם שריר הלב (Post-MI) – טיפול עורי במינון נמוך עם פרוגסטוגן בטוח.
-  * **טיפולים מקומיים ומשלימים**:
+    - נשאיות BRCA1/2 לאחר RRSO – טיפול במינונים הולמים עד גיל 51–52 לפחות בהיעדר היסטוריה אישית של סרטן שד (*[`טיפול הורמונלי לנשאיות BRCA – דר' סרבניק`](knowledge/sources/magid-course/טיפול%20הורמונלי%20לנשאיות%20BRCA-%20דר%20נעמה%20סרבניק.pdf)*).
+    - מטופלות לאחר אוטם שריר הלב (Post-MI) – הערכת רב-תחומית וטיפול עורי במינון נמוך עם פרוגסטרון מיקרוניזדי במידת הצורך (*[`BMS HRT after MI (2024)`](knowledge/sources/magid-course/21-BMS-TfC-HRT-after-myocardial-infarction-MARCH2024-A.pdf)*).
+    - אי-ספיקה שחלתית מוקדמת (POI) – מינון אסטרוגן פיזיולוגי מוגבר להגנה על העצם והלב עד גיל המנופאוזה הממוצע (*[`ASRM/ESHRE/IMS POI 2024`](knowledge/sources/magid-course/1-s20-S0015028224023859%20%281%29_261026_194559.pdf), [`HRT primary prevention 13`](knowledge/sources/red-whale/HRT%20for%20primary%20prevention%20of%20chronic%20disease%2013.docx)*).
+  * **טיפולים מקומיים ומשלימים** (*[`2 NICE Guideline 2024`](knowledge/sources/red-whale/2%20NICE%20guideline%20on%20menopause%202024_%20practice-changing%20points.docx), [`ACOG CPG No. 13 (2026)`](knowledge/sources/magid-course/ACOG.pdf), [`BMS Non-Hormonal Consensus (2026)`](knowledge/sources/magid-course/04-BMS-ConsensusStatement-Non-hormonal-based-treatments-for-menopausal-symptoms-JULY2026-D.pdf)*):
     - אסטרוגן מקומי נרתיקי (Vagifem, Ovestin), פראסטרון (Intrarosa), אוספמיפן.
     - טסטוסטרון עורי להפרעת תשוקה מינית (HSDD).
-    - חלופות לא-הורמונליות (Fezolinetant, SSRI/SNRI, Gabapentin, CBT).
-* **פלט שלב 2**:
+    - חלופות לא-הורמונליות (Fezolinetant / Veoza עם ניטור תפקודי כבד, Elinzanetant, SSRI/SNRI, Gabapentin, CBT).
+* **פלט שלב 2** (*[`טיפול – דר' רננה תאומים`](knowledge/sources/magid-course/טיפול%20-%20רננה.pptx), [`מנופאוזה טיפול`](knowledge/sources/red-whale/מנופאוזה%20טיפול.docx), [`מקרים לדיון – מפגש 5`](knowledge/sources/magid-course/מקרים%20לדיון-%20מפגש%205%20קורס%20מנופאוזה%20פרקטית.pdf)*):
   * המלצה מפורטת הכוללת שמות מסחריים בישראל, מינונים ואופן נטילה.
-  * דף תיאום ציפיות למטופלת (הסבר על 6 החודשים הראשונים והרגעת הכתמות צפויות).
-  * תזמון מעקב (3–6 חודשים).
+  * דף תיאום ציפיות למטופלת (הסבר על 3–6 החודשים הראשונים והרגעת הכתמות צפויות).
+  * תזמון מעקב ראשוני לאחר 3 חודשים ובהמשך שנתי.
   * תבנית מותאמת להעתקה לתיק הרפואי הממוחשב (EMR Copy-Paste).
 
 ---
 
 ### שלב 3: מעקב רב-מפגשי ופתרון בעיות (Longitudinal Follow-Up & Troubleshooting)
 * **ציר זמן רב-מפגשי מצטבר (Timestamped Longitudinal Care Record)**.
-* **קלט ביקור מעקב**: שינוי בתסמינים, הופעת תופעות לוואי, דפוס דימומים חדש, מדדים מעודכנים ותרופות חדשות.
+* **קלט ביקור מעקב (3 חודשים, 6 חודשים ושנתי)** (*[`שאלון סימפטומים אורכי – האגודה הישראלית לגיל המעבר`](knowledge/sources/magid-course/symptoms-quiz.pdf), [`4 HRT: starting, troubleshooting & stopping`](knowledge/sources/red-whale/4%20HRT_%20a%20guide%20to%20starting,%20troubleshooting%20and%20stopping.docx)*): השוואת דירוגי תסמינים (`לפני טיפול` ⬅️ `3 חודשים` ⬅️ `6 חודשים`), הופעת תופעות לוואי, דפוס דימומים חדש, מדדים מעודכנים ותרופות חדשות.
 * **מנועי פתרון בעיות (Troubleshooting)**:
-  * **אלגוריתם ניהול דימומים לא סדירים (דר' מרב פרייברג & BMS 2024)**:
-    - סיווג סיכון לפתולוגיה ברירית: גורם מג'ורי (BMI ≥ 40, Lynch) או ≥3 מינוריים (BMI 30–39, PCOS, סוכרת).
-    - אינטרבל הדימום: הופעה ב-6 חודשים ראשונים ⬅️ ניהול שמרני והתאמת מינון/סוג פרוגסטוגן.
-    - קריטריונים להפניה דחופה לאולטרסאונד נרתיקי (Urgent TVS תוך 6 שבועות): דימום לאחר 6 חודשים, דימום כבד וממושך, או סיכון מוגבר.
+  * **אלגוריתם ניהול דימומים לא סדירים (דר' מרב פרייברג & BMS 2024)** (*[`דימומים תחת MHT – דר' מרב פרייברג`](knowledge/sources/magid-course/דימומים%20תחת%20MHT%20-%20דר%20מרב%20פרייברג.pptx), [`Problematic bleeding on HRT 11`](knowledge/sources/red-whale/Approaching%20and%20managing%20problematic%20bleeding%20on%20HRT%2011.docx)*):
+    - סיווג סיכון לפתולוגיה ברירית: גורם מג'ורי (BMI ≥ 40, Lynch, משטר לא מותאם) או ≥3 מינוריים (BMI 30–39, PCOS/אנובולציה, סוכרת).
+    - אינטרבל הדימום: הופעה ב-6 חודשים ראשונים להתחלת טיפול (או 3 חודשים משינוי מינון) בהיעדר גורמי סיכון ⬅️ ניהול שמרני והתאמת מינון/סוג פרוגסטוגן.
+    - קריטריונים להפניה דחופה לאולטרסאונד נרתיקי (Urgent TVS תוך 6 שבועות): דימום לאחר 6 חודשים, דימום כבד וממושך, או קיום גורמי סיכון לסרטן רירית הרחם.
     - ספי עובי רירית תקינים: ≤4 מ"מ בטיפול רציף (ccHRT) או ≤7 מ"מ בטיפול סדרתי (sHRT).
-  * **פתרון תופעות לוואי שכיחות**:
+  * **פתרון תופעות לוואי והחלפת תכשירים** (*[`דימומים תחת MHT – דר' מרב פרייברג`](knowledge/sources/magid-course/דימומים%20תחת%20MHT%20-%20דר%20מרב%20פרייברג.pptx), [`6 HRT availability, switching & off-licence`](knowledge/sources/red-whale/HRT_%20availability,%20switching%20and%20off-licence%20prescribing%206.docx), [`GEM בעיות`](knowledge/sources/red-whale/GEM.pdf%20בעיות.pdf)*):
     - גודש בחזה ⬅️ הפחתת מינון אסטרוגן או מעבר לפרוגסטרון מיקרוניזדי.
-    - נמנום ועייפות ⬅️ העברת פרוגסטרון מיקרוניזדי לשעת השינה בלילה.
+    - נמנום ועייפות ⬅️ העברת פרוגסטרון מיקרוניזדי לשעת השינה בלילה (אפקט GABA-A).
     - תנודות במצב רוח ואקנה ⬅️ מעבר מ-NETA לדידרוגסטרון או לפרוגסטרון מיקרוניזדי.
-  * **תרחיש הפסקת טיפול (Treatment Cessation)**:
-    - התוויות להפסקה (גיל 55, חלוף תסמינים, קונטרא-אינדיקציה חדשה).
-    - פרוטוקול הפחתה הדרגתית (Tapering protocol) ומעקב.
+  * **תרחיש הפסקת טיפול (Treatment Cessation)** (*[`4 HRT: starting, troubleshooting & stopping`](knowledge/sources/red-whale/4%20HRT_%20a%20guide%20to%20starting,%20troubleshooting%20and%20stopping.docx)*):
+    - החלטה משותפת ללא מגבלת גיל שרירותית (או התוויות רפואיות חדשות להפסקה).
+    - פרוטוקול הפחתה הדרגתית (Tapering protocol) מול הפסקה מיידית ומעקב אחר הישנות תסמינים וצפיפות עצם.
 
 ---
 
 ### מודול H: דף עזר מהיר לרופא/ה (Physician Quick-Reference Guide)
-כרטיסיית עזר קלינית זמינה בכל רגע באפליקציה:
-* שיקולי בחירת ציר המתן (עורי מול פומי).
-* טבלת השוואת פרוגסטרונים מפורטת (פרופיל בטיחות שד, VTE, עצם ואנדרוגניות).
-* טבלת אינטראקציות תרופתיות קריטיות (GLP-1, משרני אנזימים, טמוקסיפן, תירוקסין).
-* תמצית הנחיות BRCA1/2 ונשאיות לאחר RRSO.
-* תמצית ניהול דימומים וספי עובי רירית ב-TVS.
+כרטיסיית עזר קלינית זמינה בכל רגע באפליקציה (*מבוססת על [`GEMS טייפול`](knowledge/sources/red-whale/GEMS%20טייפול.pdf), [`GEM בעיות`](knowledge/sources/red-whale/GEM.pdf%20בעיות.pdf), [`טיפול – דר' רננה תאומים`](knowledge/sources/magid-course/טיפול%20-%20רננה.pptx) ו-[`סוג הפרוגסטרון – דר' סרבניק`](knowledge/sources/magid-course/סוג%20הפרוגסטרון%20בטיפול%20ההורמונלי-%20דר%20נעמה%20סרבניק.pdf)*):
+* שיקולי בחירת ציר המתן (עורי מול פומי) ומקבילות מינוני אסטרוגן.
+* טבלת השוואת פרוגסטוגנים מפורטת (פרופיל בטיחות שד, VTE, עצם ואנדרוגניות) והתאמת מינון פרוגסטוגן למינון האסטרוגן.
+* טבלת אינטראקציות תרופתיות קריטיות (GLP-1, משרני אנזימים/למוטריג'ין, טמוקסיפן, תירוקסין – *[`Drug interactions 14`](knowledge/sources/red-whale/Drug%20interactions%20with%20HRT%2014.docx)*).
+* תמצית הנחיות BRCA1/2 ונשאיות לאחר RRSO (*[`נשאיות BRCA – דר' סרבניק`](knowledge/sources/magid-course/טיפול%20הורמונלי%20לנשאיות%20BRCA-%20דר%20נעמה%20סרבניק.pdf)*).
+* תמצית ניהול דימומים וספי עובי רירית ב-TVS (*[`דימומים תחת MHT – דר' פרייברג`](knowledge/sources/magid-course/דימומים%20תחת%20MHT%20-%20דר%20מרב%20פרייברג.pptx), [`Problematic bleeding 11`](knowledge/sources/red-whale/Approaching%20and%20managing%20problematic%20bleeding%20on%20HRT%2011.docx)*).
 
 ---
 
 ## 📚 בסיס הידע הקליני במאגר | Clinical Knowledge Base
 
-תיקיות המאגר מכילות את מלוא ספרות הידע והפרוטוקולים עליהם מתבסס האלגוריתם:
+כל ספרות הידע הקלינית במאגר מאורגנת במבנה תלת-שכבתי עקבי תחת תיקיית [`knowledge/`](knowledge/), עם שלוש תיקיות משנה בלבד, כאשר כל שכבה מקשרת במדויק לשכבה שקדמה לה (`Layer 3` ⬅️ סעיפים מדויקים ב-`Layer 2` ⬅️ קובצי המקור ב-`Layer 1`):
 
-### 1. תיקיית `RED WHALE מנופאוזה` (Red Whale Evidence-Based Guidelines):
-* `1 Approaching and diagnosing menopause.docx` – אבחון קליני, קריטריונים ותשאול.
-* `2 NICE guideline on menopause 2024_ practice-changing points.docx` – עדכוני הנחיות NICE 2024.
-* `3 Different types of HRT_ bioidentical, conjugated and synthetic.docx` – סוגי טיפול הורמונלי.
-* `4 HRT_ a guide to starting, troubleshooting and stopping.docx` – התחלה, פתרון תקלות וגמילה.
-* `5 HRT regimens and progestogen doses.docx` – משטרי טיפול ומינוני פרוגסטוגן.
-* `6 HRT_ availability, switching and off-licence prescribing.docx` – החלפות תכשירים וזמינות.
-* `7 HRT and breast cancer risk.docx` – הערכת סיכון לסרטן שד.
-* `8 HRT and risk of VTE.docx` – פקקת ורידית ומשמעות דרך המתן.
-* `10 HRT and osteoporosis.docx` – מניעה וטיפול באוסטאופורוזיס ושברים.
-* `11 Approaching and managing problematic bleeding on HRT.docx` – ניהול דימומים לא תקינים.
-* `12 HRT and risk of gynaecological and other cancers.docx` – סיכוני ממאירויות נשיות נוספות.
-* `13 HRT for primary prevention of chronic disease.docx` – מניעה ראשונית של מחלות כרוניות.
-* `14 Drug interactions with HRT.docx` – אינטראקציות בין-תרופתיות.
-* מסמכים נוספים בעברית: אבחון RED WHALE, אופציות טיפוליות, אמצעי מניעה, טבלת תרופות גיל המעבר.
+### 1. שכבה 3 – סיכומי נושאים ואינדקס מרכזי: [`knowledge/summaries/`](knowledge/summaries/INDEX.md)
+נקודת הכניסה המרכזית לפיתוח ולהרחבת האלגוריתם הקליני:
+* [`INDEX.md`](knowledge/summaries/INDEX.md) – אינדקס ראשי, מפת עקיבות מלאה (40 מתוך 40 מקורות) ומיפוי למודולי האפליקציה.
+* [`01-diagnosis-staging-and-straw10.md`](knowledge/summaries/01-diagnosis-staging-and-straw10.md) – פיזיולוגיה, מחזורי LOOP, שלבי `STRAW+10` ומתי לבדוק `FSH`.
+* [`02-initial-assessment-screening-and-completeness-gate.md`](knowledge/summaries/02-initial-assessment-screening-and-completeness-gate.md) – אנמנזה מובנית, שאלון תסמינים אורכי (IMS), בדיקות סקר בסל הבריאות הישראלי (הר"י) ושער שלמות הנתונים.
+* [`03-systemic-mht-regimens-routes-and-dosing.md`](knowledge/summaries/03-systemic-mht-regimens-routes-and-dosing.md) – משטרי `ET` / `sHRT` / `ccHRT`, מתן עורי מול פומי ומקבילות מינוני אסטרוגן.
+* [`04-progestogen-selection-and-endometrial-protection.md`](knowledge/summaries/04-progestogen-selection-and-endometrial-protection.md) – השוואת פרוגסטוגנים והתאמת מינון פרוגסטוגן למינון האסטרוגן להגנה על רירית הרחם.
+* [`05-cardiovascular-vte-and-metabolic-risk.md`](knowledge/summaries/05-cardiovascular-vte-and-metabolic-risk.md) – ריבוד סיכון קרדיווסקולרי (`ASCVD` / `AHA PREVENT™` / `SCORE`), `VTE` וטיפול לאחר אוטם שריר הלב (`Post-MI`).
+* [`06-cancer-risks-osteoporosis-and-brca-carriers.md`](knowledge/summaries/06-cancer-risks-osteoporosis-and-brca-carriers.md) – סרטן שד וממאירויות גינקולוגיות, אוסטאופורוזיס ופרוטוקול נשאיות `BRCA1/2` לאחר `RRBSO`.
+* [`07-poi-early-menopause-and-contraception.md`](knowledge/summaries/07-poi-early-menopause-and-contraception.md) – אי-ספיקה שחלתית מוקדמת (`POI` – הנחיות `ASRM/ESHRE 2024`), מנופאוזה מוקדמת ואמצעי מניעה בפרי-מנופאוזה.
+* [`08-gsm-sexual-health-and-non-hormonal-therapies.md`](knowledge/summaries/08-gsm-sexual-health-and-non-hormonal-therapies.md) – `GSM`, טסטוסטרון ל-`HSDD` וחלופות לא-הורמונליות (`Fezolinetant`, `Elinzanetant`, `SSRI/SNRI`, `CBT`).
+* [`09-unscheduled-bleeding-side-effects-interactions-and-stopping.md`](knowledge/summaries/09-unscheduled-bleeding-side-effects-interactions-and-stopping.md) – ניהול דימומים לא סדירים (`BMS 2024` / דר' פרייברג), תופעות לוואי, אינטראקציות (`GLP-1`, `Lamotrigine` ועוד) והפסקת טיפול.
+* [`10-israeli-formulary-clinical-cases-and-design-alignment.md`](knowledge/summaries/10-israeli-formulary-clinical-cases-and-design-alignment.md) – פורמולריום התכשירים בישראל, 9 מקרים קליניים מקורס מגיד ושדרוגים מבוססי-ראיות למנוע ההחלטות.
 
-### 2. תיקיית `מנפואזה קורס מגיד` (חומרי קורס מנופאוזה פרקטית):
-* **אבחון שלבי גיל המעבר** (דר' סיגל שקלאי) – יישום קליני של קריטריוני STRAW+10.
-* **דימומים תחת MHT** (דר' מרב פרייברג) – עץ החלטה לניהול דימומים, TVS וביופסיה.
-* **סוג הפרוגסטרון בטיפול ההורמונלי** (דר' נעמה סרבניק) – הבדלים מולקולריים ובטיחותיים.
-* **טיפול הורמונלי לנשאיות BRCA** (דר' נעמה סרבניק) – פרוטוקולי HRT לאחר RRSO.
-* **טיפול הורמונלי ומנופאוזה** (רננה) – מצגת והנחיות קליניות לרופאת הקהילה.
-* **BMS (British Menopause Society)** – הצהרות קונצנזוס על טיפולים לא-הורמונליים ו-HRT לאחר אוטם שריר הלב.
-* **הנחיות ACOG ומאמרי NEJM**.
+### 2. שכבה 2 – גרסאות Markdown מלאות ונאמנות למקור: [`knowledge/markdown/`](knowledge/markdown/)
+40 קובצי Markdown (יחס 1:1 מול קובצי הקלט ב-`knowledge/sources/`, כולל תמלול מלא של טבלאות, תרשימי זרימה ושקופיות סרוקות):
+* [`knowledge/markdown/red-whale/`](knowledge/markdown/red-whale/) – **19** מדריכי **Red Whale / NICE 2024 / GEMS** וסיכומי עזר בעברית.
+* [`knowledge/markdown/magid-course/`](knowledge/markdown/magid-course/) – **21** מקורות **קורס מנופאוזה פרקטית (מגיד)** (דר' סיגל שקלאי, דר' מרב פרייברג, דר' נעמה סרבניק, דר' רננה תאומים, צ'ק-ליסט אנמנזה, שאלון סימפטומים של האגודה הישראלית לגיל המעבר ו-9 מקרים לדיון), מחשבון **MDCalc #10491 AHA PREVENT™**, הנחיות **ACOG CPG No. 13 (2026)**, **ASRM/ESHRE/IMS POI (2024)**, **NEJM**, **BMS (2024–2026)** והנחיות הרפואה המונעת של הר"י.
+
+### 3. שכבה 1 – קובצי המקור הגולמיים: [`knowledge/sources/`](knowledge/sources/)
+40 קובצי הקלט המקוריים (`.docx`, `.pdf`, `.pptx`, `.jpeg`, `.html`) ללא שינוי, בשתי תיקיות מקור:
+* [`knowledge/sources/red-whale/`](knowledge/sources/red-whale/) (19 קבצים): סדרת Red Whale פרקים 1–8 ו-10–14, תרשימי GEMS ([`GEMS טייפול.pdf`](knowledge/sources/red-whale/GEMS%20טייפול.pdf), [`GEM.pdf בעיות.pdf`](knowledge/sources/red-whale/GEM.pdf%20בעיות.pdf)) וסיכומי Red Whale בעברית.
+* [`knowledge/sources/magid-course/`](knowledge/sources/magid-course/) (21 קבצים): הרצאות הקורס, צ'ק-ליסט [`אנמנזה מנפאוזה.docx`](knowledge/sources/magid-course/אנמנזה%20מנפאוזה.docx), [`symptoms-quiz.pdf`](knowledge/sources/magid-course/symptoms-quiz.pdf), [`MDCalc-10491-AHA-PREVENT-Calculator.html`](knowledge/sources/magid-course/MDCalc-10491-AHA-PREVENT-Calculator.html), [`ACOG.pdf`](knowledge/sources/magid-course/ACOG.pdf), [`clinical_118_HealthPromotionPreventiveMedicine.pdf`](knowledge/sources/magid-course/clinical_118_HealthPromotionPreventiveMedicine.pdf), מאמרי `ASRM/ESHRE/IMS POI`, `NEJM`, `BMS` ושקופיות העזר הקליניות.
 
 ---
 
@@ -244,10 +246,10 @@ menopause-app/
 │   ├── App.tsx                   # רכיב ראשי וניהול מעבר בין שלבים
 │   └── main.tsx
 │
-├── RED WHALE מנופאוזה/           # מאגר קובצי הידע המקוריים (Red Whale)
-├── מנפואזה קורס מגיד/            # מאגר קובצי קורס מנופאוזה פרקטית
-├── menopause-app-design.docx     # מסמך האפיון המקורי המלא
-├── menopause-app-design.txt      # תמליל האפיון לעיון מהיר
+├── knowledge/                    # בסיס הידע הקליני (3 שכבות מקושרות)
+│   ├── sources/                  # שכבה 1: קובצי הקלט המקוריים (red-whale, magid-course)
+│   ├── markdown/                 # שכבה 2: גרסאות Markdown מלאות ונאמנות למקור (1:1 מול sources)
+│   └── summaries/                # שכבה 3: אינדקס ראשי (INDEX.md) ו-10 סיכומי נושאים קליניים
 │
 ├── .gitignore
 ├── package.json

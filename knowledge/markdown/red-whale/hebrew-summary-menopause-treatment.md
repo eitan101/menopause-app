@@ -1,0 +1,170 @@
+---
+title: "Menopause Treatment Summary — מנופאוזה טיפול"
+collection: "red-whale"
+source_file: "מנופאוזה טיפול.docx"
+source_path: "knowledge/sources/red-whale/מנופאוזה טיפול.docx"
+source_format: "DOCX"
+language: "he"
+authors_or_org: "Red Whale (GP Update)"
+date_or_version: "Unknown"
+---
+
+# Menopause Treatment Summary — מנופאוזה טיפול
+
+> **Layer 1 Source Reference:** [`מנופאוזה טיפול.docx`](../../sources/red-whale/%D7%9E%D7%A0%D7%95%D7%A4%D7%90%D7%95%D7%96%D7%94%20%D7%98%D7%99%D7%A4%D7%95%D7%9C.docx)
+> **Collection:** Red Whale Menopause Guidelines | **Original Format:** `DOCX` | **Review Date:** `Unknown`
+
+## Core HRT Components and Route — מרכיבי הטיפול ההורמונלי (אסטרוגן ופרוגסטרון)
+
+מנופאוזה טיפול-
+
+> **עיקרון מפתח:** טיפול טרנסדרמלי של אסטרוגן + פרוגסטרון מיקרו נחשב הטיפול היעיל והבטוח.
+
+### Estrogen — אסטרוגן
+
+המרכיב הטיפולי, `OESTRADIOL` או `OESTADIOL ACETATE`, מצמחים ומחקים אנושי, מינון משתנה בין הפורמולות השונות.
+
+### Progesterone and Progestogens — פרוגסטרון
+
+מגן על האנדומטריום, סטרואיד סינטטי המיוצר מ:
+
+- **פרוגסטרון** – ממנו מיצרים META *(MPA)* ודידרוגסטרון.
+- **טסטוסטרון** – ממנו מיצרים נוראתיסטרון ולבונורגסטרל.
+
+Transdermal HRT is associated with a lower risk of VTE and stroke, and the BMS considers this form of HRT to be first line for women at increased risk of these conditions (e.g. because of medical history, age or weight).
+
+### What Are the Advantages of rBHRT Over HRT Containing Synthetic Progestogens?
+
+- rBHRT progesterones may have fewer androgenic side-effects than conventional HRT.
+- Transdermal oestrogen does not increase VTE risk.
+- There is observational and case–control data suggesting that micronised progesterone may reduce the risk of VTE associated with oral oestrogen when compared with conventional synthetic progestogens.
+- Micronised progesterone has neutral effects on breast cell proliferation, whereas synthetic progestogens such as medroxyprogesterone acetate have a proliferative effect. Oestrogen used with micronised progesterone is associated with a lower relative risk of breast cancer than other types of combined HRT. Further data from larger studies is required to confirm these potential benefits.
+
+## Tibolone — טיבולון
+
+Tibolone is a synthetic steroid with oestrogenic, progestogenic and androgenic properties which has been in clinical use since the early 1990s for treatment of menopausal symptoms.
+
+Because of its androgenicity, it is sometimes used in postmenopausal women for whom low libido is an issue.
+
+In 2016, Cochrane reviewed the short and long-term effects of tibolone in postmenopausal women. Its findings are summarised below:
+
+### Benefits
+
+- Tibolone is more effective than placebo but less effective than combined HRT in reducing postmenopausal symptoms.
+- Tibolone is associated with a lower rate of unscheduled bleeding than combined HRT.
+
+### Risks
+
+*(Note: most of the studies had a follow up of 2–3y, and evidence was mostly low quality.)*
+
+- Tibolone does not appear to increase the risk of breast cancer, although it does increase the risk of recurrent breast cancer in women with a history of breast cancer (see LIBERATE study: [Drug Safety Update,2009;2(7)](https://www.gov.uk/drug-safety-update/tibolone-benefit-risk-balance)).
+- Tibolone does not appear to increase CVA but may increase rates of CVA in women over 60y.
+- Tibolone does not appear to increase the risk of endometrial cancer, CVD, VTE or mortality from any cause.
+- Tibolone does not appear to differ significantly from combined HRT in terms of long-term risks.
+
+### Does It Actually Improve Libido?
+
+Cochrane also looked at hormone therapy for treating perimenopausal sexual function ([CD009672, 2013](https://doi.org/10.1002/14651858.CD009672)) and concluded that:
+
+- Current evidence does not demonstrate an important effect of tibolone on sexual function.
+- This evidence is of low quality so more research is needed.
+- Conventional HRT does appear to improve sexual function in symptomatic menopausal women.
+
+## Indications and Efficacy of HRT — התוויות ויעילות הטיפול ההורמונלי
+
+### Indications for Prescribing HRT
+
+Based on its review of the evidence, NICE recommends HRT for:
+
+- Vasomotor symptoms that are impacting on quality of life in perimenopausal and menopausal women.
+- Depressive symptoms associated with vasomotor symptoms in perimenopausal and menopausal women (CBT is recommended as an alternative).
+- Women with premature ovarian insufficiency (menopause <40y) for symptom control, bone and cardiovascular protection. *These women SHOULD take HRT until the age of natural menopause (usually aged 51y), unless contraindicated.*
+
+### How Effective Is HRT?
+
+The British Menopause Society states that:
+
+- There is strong evidence that HRT reduces the frequency of hot flushes in menopausal women, and is the most effective treatment for vasomotor symptoms *(consequently, women on HRT may sleep better, and therefore feel and function better).*
+- Observational data suggests that HRT may improve mood and depressive symptoms in menopausal women.
+- HRT may improve sexual function by increasing libido (and topical oestrogen may treat dyspareunia due to vaginal atrophy).
+- Musculoskeletal symptoms associated with menopause may improve with HRT (although the evidence surrounding this is conflicting and limited – [Lancet Rheumatol, 2023; 5: e225](https://doi.org/10.1016/s2665-9913(23)00060-7)).
+- HRT has a significant protective effect against osteoporosis, and should be used as treatment of choice for osteoporosis prevention in menopausal women.
+- HRT may reduce risk of cardiovascular disease if taken <60y.
+
+## Contraindications to HRT — התוויות נגד לטיפול הורמונלי
+
+Prior to starting HRT, we should assess for medical suitability, check BMI and BP, and check that screening is up to date.
+
+The box below lists the following contraindications to HRT as per a typical product licence.
+
+If a woman has any of these conditions, refer to a menopause specialist to discuss treatment options.
+
+> - Current, past or suspected breast cancer.
+> - Current, past or suspected hormone-sensitive malignant tumours (e.g. endometrial cancer) or premalignant conditions (e.g. untreated endometrial hyperplasia).
+> - Undiagnosed genital bleeding.
+> - Previous or current VTE.
+> - Active or recent arterial, cardiovascular or cerebrovascular disease.
+> - Active liver disease, or past liver disease with persistently abnormal liver function tests.
+> - Known thrombophilic disorders (e.g. protein C/S or antithrombin deficiency).
+> - Known hypersensitivity to any constituent ingredients of HRT.
+> - Porphyria.
+
+Remember:
+
+- The presence of cardiovascular risk factors (e.g. hypertension) is not a contraindication to HRT, but they should be optimally managed ([NICE NG23,2015](https://www.nice.org.uk/guidance/ng23)).
+- Migraines are not a contraindication to HRT, but we should use transdermal preparations due to reduced stroke risk ([BMS – migraine and HRT](https://thebms.org.uk/wp-content/uploads/2022/12/06-BMS-TfC-Migraine-and-HRT-NOV2022-A.pdf)).
+
+## Counselling About HRT — ייעוץ על סיכונים ותועלות
+
+This summarises the evidence on disease risks:
+
+| Condition | Risks |
+| :--- | :--- |
+| **Breast cancer** | Associated with small increased risk. Risk increases with duration of use, and is greater with combined than oestrogen-only HRT.<br>Micronised progesterone and dydrogesterone may be safer progestogens.<br>Lifestyle factors (obesity, alcohol consumption) likely to have a greater impact on breast cancer risk than HRT. |
+| **Endometrial cancer** | Increased risk associated with unopposed oestrogen use or inadequate progestogen in HRT regimen.<br>Sequential HRT use confers no additional risk for up to 5y of use. After 5y, risk increases 3-fold.<br>Continuous combined HRT is associated with reduced risk so women should be on this regimen after 5y of HRT use, or by age 54y. |
+| **Ovarian cancer** | Associated with slight increased risk (suggested from epidemiological studies, but causation cannot be inferred). |
+| **VTE** | Oral HRT associated with increased risk, but observational data suggests transdermal oestrogen appears safe (it avoids first-pass liver metabolism, and may not activate clotting factors to the same degree or at all).<br>Individual risk depends on other risk factors, and risk of VTE is generally low in early post-menopause years. |
+| **Cardiovascular disease (CVD)** | CVD is the commonest cause of death in postmenopausal women.<br>HRT doesn’t increase risk of CVD in women.<br>HRT may be cardioprotective in younger postmenopausal women (<10y from last period), but evidence is not strong enough to recommend as primary prevention for CVD. |
+| **Stroke (CVA)** | Oral HRT increases risk of stroke, but observational evidence suggests that low-dose transdermal preparations are safer.<br>Type of progestogen may impact risk of CVA: micronised progesterone and dydrogesterone appear safer.<br>Risk of stroke depends on cardiovascular risk factors, but is generally low in early post-menopause years. |
+| **Dementia** | Data is conflicting, but, overall, current evidence suggests that HRT does not increase nor decrease the risk of dementia. |
+
+## Monitoring and Troubleshooting Side-Effects — מעקב וניהול תופעות לוואי
+
+The British Menopause Society recommends an initial review at 3m and annual review thereafter, unless the woman develops problems. In an HRT review, we should:
+
+- Cover symptom control, ongoing indication, side-effects and bleeding pattern.
+- Check BMI and blood pressure.
+- Reinforce healthy lifestyle advice.
+- Ensure cervical and breast screening are up to date.
+
+Hopefully, once your patient has started HRT, her menopausal symptoms will settle and she will feel a lot better, and you won’t see her again until her scheduled reviews. However, this is not always the case. Sometimes, the hormones will cause side-effects and she will come back for further advice.
+
+Let’s look at what we should do…
+
+| Clinical Area / Principle | Recommendations & Actions |
+| :--- | :--- |
+| **Oestrogenic side-effects** | May be minimised by starting with a low-dose preparation.<br>May include fluid retention, bloating, breast tenderness/enlargement, nausea, headaches and dyspepsia.<br>Try lower-dose preparation or switch delivery route – transdermal preparations may be better tolerated and easier to titrate. |
+| **Progestogenic side-effects** | One of the main reasons for reduced HRT compliance.<br>Fluid retention, breast tenderness, headaches, mood swings, PMS-like symptoms, acne, hirsutism.<br>Symptoms that occur in a cyclical pattern, coinciding with progestogen in a sequential regimen, are likely to be due to progestogen.<br>Androgenic side-effects (acne, hirsutism) may occur with testosterone-derived progestogens (e.g. norethisterone and levonorgestrel). Medroxyprogesterone acetate (MPA) or dydrogesterone-based preparations may be better tolerated.<br>Micronised progesterone may also be better tolerated than synthetic progestogens because it is less likely to interact with androgenic or mineralocorticoid receptors.<br>Although off-licence, the BMS endorses vaginal use of micronised progesterone capsules, which may further improve tolerability.<br>52mg IUS may be associated with fewer systemic side-effects due to its localised action.<br>To control progestogen exposure, consider using separate oestrogen and progestogen preparations. Cochrane data suggests that the minimum required doses of progestogen for endometrial protection are:<br>• Continuous: 1mg/d norethisterone, 2.5mg/d MPA, 100mg/d micronised progesterone.<br>• Sequential: 1mg/d norethisterone for 10d/m, 10mg/d MPA for 10d/m, 200mg/d micronised progesterone for 12d/m.<br>The BMS states that reducing the dose and/or duration of progestogen below the doses above may reduce adverse side-effects, but should be balanced with increased risk of hyperplasia (*so not something we should routinely do in primary care*).<br>The BMS also mentions the use of off-licence contraceptive progestogens such as desogestrel 150mcg (2 Cerelle or equivalent tablets) or 3 Noriday tablets/day (*again, probably not something we should initiate in primary care*). |
+| **Unscheduled bleeding** | For full details on assessment and management, see our article *Approaching and managing problematic bleeding on HRT*. In summary:<br>Erratic bleeding is common in the first 3–6m of HRT treatment, but unscheduled bleeding may indicate pathology.<br>Initial assessment of bleeding should involve history, examination and assessment of endometrial risk factors.<br>The BMS recommends that further investigation of bleeding is based on risk stratification for endometrial cancer:<br>• Women at lower risk may be offered 6m optimisation of their HRT regimen or transvaginal ultrasound scanning.<br>• Those at higher risk, or identified as having pathology, may need to be referred to gynaecology urgently or via the suspected cancer pathway.<br>Once gynaecological pathology has been excluded or managed, unscheduled bleeding on HRT may be managed by reducing the dose of oestrogen or altering the dose, type or regimen of progestogen.<br>For continuous regimens:<br>• Increase daily dose of progestogen (e.g. take 200mg micronised progesterone daily).<br>• Add additional progestogen (e.g. add oral progestogen to transdermal regimen or IUS).<br>• Switch back to sequential regimen for 12m.<br>• Try tibolone, which is associated with less bleeding.<br>For sequential regimens:<br>• Increase dose of progestogen (e.g. take 300mg micronised progesterone for 12d/m).<br>• Increase duration of progestogen (e.g. take for 14–21d/m). |
+
+## Duration of Use and Stopping HRT — משך הטיפול והפסקת HRT
+
+There should be no arbitrary limit on duration of HRT use. At each review, we should discuss the risks and benefits of continued usage on an individual basis.
+
+The BMS advises that:
+
+- HRT prescribed <60y has a favourable benefit/risk profile.
+- If HRT is prescribed to a woman >60y, use lower doses and preferably a transdermal route.
+
+### Tapering HRT vs. Abrupt Withdrawal
+
+- HRT may be reduced gradually over 3–6m or stopped abruptly.
+- Studies suggest that tapering reduces short-term recurrence of symptoms, but makes no difference in the long term.
+
+## Endometrial Cancer Risk Factors and Regimen Choice — גורמי סיכון לסרטן רירית הרחם
+
+| Major risk factors for endometrial cancer | Minor risk factors for endometrial cancer |
+| :--- | :--- |
+| BMI ≥40.<br>Genetic risk (e.g. Lynch syndrome).<br>Unopposed oestrogen use for >6m.<br>Prolonged use of sequential regimen (>5y when started in a woman ≥45y).<br>Inadequate progestogen use in a sequential regimen for ≥12m:<br>• Tricycling HRT and giving quarterly progestogen.<br>• Using <10d of medroxyprogesterone acetate (MPA) or norethisterone per month.<br>• Using <12d of micronised progesterone per month. | BMI 30–39.<br>Anovulatory cycles (e.g. PCOS).<br>Diabetes mellitus.<br>Unopposed oestrogen use for 3–6m.<br>Inadequate progestogen dose for oestrogen dose (including expired IUS) for >12m.<br>Inadequate progestogen dose in a sequential regimen for 6–12m:<br>• Tricycling HRT and giving quarterly progestogen.<br>• Using <10d of medroxyprogesterone acetate (MPA) or norethisterone per month.<br>• Using <12d of micronised progesterone per month. |
+
+Continuous regimens are safer for the endometrium than sequential regimens. However, perimenopausal women who still have some endogenous ovarian hormone production may develop unscheduled bleeding on continuous regimens. Therefore, when choosing the type of formulation, we need to balance risk of bleeding with risk of endometrial cancer. The BMS recommends the following: *(see `hebrew-summary-hrt-and-progesterone.md` / `05-hrt-regimens-and-progestogen-doses.md` — the two trailing table skeletons at the end of this source `.docx` are blank).*

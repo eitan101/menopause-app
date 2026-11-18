@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Predicting Risk of Cardiovascular Disease EVENTs (PREVENT™) Calculator — MDCalc #10491</title>
+  <link rel="canonical" href="https://www.mdcalc.com/calc/10491/predicting-risk-cardiovascular-disease-events-prevent" />
+  <meta name="source-url" content="https://www.mdcalc.com/calc/10491/predicting-risk-cardiovascular-disease-events-prevent" />
+  <meta name="retrieved-at" content="2026-11-18" />
+</head>
+<body>
+  <header>
+    <h1>Predicting Risk of Cardiovascular Disease EVENTs (PREVENT™) Calculator</h1>
+    <p><strong>Source URL:</strong> <a href="https://www.mdcalc.com/calc/10491/predicting-risk-cardiovascular-disease-events-prevent">https://www.mdcalc.com/calc/10491/predicting-risk-cardiovascular-disease-events-prevent</a></p>
+    <p><strong>Subtitle:</strong> Predicts 10- and 30-year risk of CVD and CVD subtypes in patients aged 30–79 without known CVD.</p>
+    <p><strong>Creator:</strong> PREVENT™ Team (AHA Predicting Risk of CVD Events; Khan SS et al., <em>Circulation</em> 2024;149:430–449) · <strong>Content Contributor:</strong> Rahul Aggarwal, MD · <strong>MDCalc Quality Rating:</strong> 7.5/10 (Scientific Soundness 3.5/6, Importance 3/3, Usability &amp; Feasibility 1/1)</p>
+  </header>
+
+  <section id="instructions">
+    <h2>Instructions</h2>
+    <p>PREVENT consists of a base model and optional add-on variables that incorporate urine albumin-to-creatinine ratio (UACR), HbA1c, and zip code-level social deprivation index (SDI). The optional variables add very little predictive value, and the base model is adequate in most primary prevention patients. UACR and HbA1c are most useful in patients with severe albuminuria or diabetes, particularly if glycemic control is poor.</p>
+    <ul>
+      <li>This tool defaults to the <strong>Base</strong> model.</li>
+      <li>If you are using only one optional variable, select that named model for use (<code>uACR</code>, <code>HbA1c</code>, or <code>SDI</code>). If you have all optional variables, select the <strong>Full</strong> model for use.</li>
+      <li><strong>BMI</strong> is used to estimate heart failure risk; if the patient's BMI falls outside the studied range, this tool will not produce a heart failure risk estimate but will still generate estimates for all other cardiovascular subtypes.</li>
+    </ul>
+  </section>
+
+  <section id="inputs">
+    <h2>Calculator Models &amp; Input Variables</h2>
+    <p><strong>Model Options:</strong> Base (default) | uACR | HbA1c | SDI | Full</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Variable</th>
+          <th>Type / Units</th>
+          <th>Notes &amp; Validated PREVENT Bounds</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Sex</td><td>Female / Male</td><td>Sex-specific, race-free equations</td></tr>
+        <tr><td>Age</td><td>years</td><td>30–79 years (10-year risk for 30–79; 30-year risk for 30–59)</td></tr>
+        <tr><td>Total cholesterol</td><td>mg/dL (or mmol/L)</td><td>130–320 mg/dL</td></tr>
+        <tr><td>HDL cholesterol</td><td>mg/dL (or mmol/L)</td><td>20–100 mg/dL</td></tr>
+        <tr><td>Systolic Blood Pressure (SBP)</td><td>mm Hg</td><td>90–200 mm Hg</td></tr>
+        <tr><td>Diabetes</td><td>No / Yes</td><td>History of diabetes mellitus</td></tr>
+        <tr><td>Current smoker</td><td>No / Yes</td><td>Active tobacco smoking</td></tr>
+        <tr><td>eGFR</td><td>mL/min/1.73 m²</td><td>15–140 mL/min/1.73 m² (2021 race-free CKD-EPI)</td></tr>
+        <tr><td>Using anti-hypertensive medication</td><td>No / Yes</td><td>Current blood-pressure lowering pharmacotherapy</td></tr>
+        <tr><td>Using statins</td><td>No / Yes</td><td>Current statin lipid-lowering therapy</td></tr>
+        <tr><td>BMI</td><td>kg/m²</td><td>18.5–39.9 kg/m² (required for Heart Failure subtype model)</td></tr>
+        <tr><td>Optional add-ons</td><td>uACR (mg/g), HbA1c (%), SDI (1–10 by ZIP)</td><td>Used in single-add-on or Full models</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="advice">
+    <h2>Next Steps — Advice</h2>
+    <ul>
+      <li>Use results to support shared decision-making around cardiovascular prevention strategies.</li>
+      <li>Risk estimates should be interpreted in the context of:
+        <ul>
+          <li>Patient comorbidities (e.g., diabetes, CKD, obesity).</li>
+          <li>Risk-enhancing factors (e.g., family history, lipoprotein(a), inflammatory conditions, coronary artery calcium score).</li>
+          <li>Patient preferences and treatment goals.</li>
+        </ul>
+      </li>
+      <li>Consider both 10-year and 30-year risk, particularly in younger patients, where long-term risk may better inform early preventive strategies.</li>
+      <li>As predicted risk increases, the intensity of lifestyle counseling and therapeutic intervention should increase accordingly.</li>
+      <li>In general, lipid-lowering therapy is now recommended in individuals with a &ge;3% 10-year ASCVD risk estimate.</li>
+      <li>Ensure management of modifiable risk factors (e.g., lipids, blood pressure, glycemia, smoking) regardless of calculated risk.</li>
+      <li>Reassess risk over time as clinical status and risk factors change.</li>
+      <li>Evaluate for secondary causes of dyslipidemia or elevated CVD risk when appropriate.</li>
+    </ul>
+  </section>
+
+  <section id="management">
+    <h2>Next Steps — Guideline Management Thresholds</h2>
+
+    <h3>Hypertension (2025 AHA/ACC Guideline — based on 10-year Total CVD risk)</h3>
+    <ul>
+      <li><strong>BP &ge;130/80 mmHg:</strong>
+        <ul>
+          <li>Treat pharmacologically if 10-year total CVD risk estimate is <strong>&ge;7.5%</strong>, or if clinical CVD, diabetes, or CKD is present.</li>
+          <li>If 10-year total CVD risk estimate is <strong>&lt;7.5%</strong>, try lifestyle modification for 3–6 months first; start medication if BP remains elevated.</li>
+        </ul>
+      </li>
+      <li><strong>BP &ge;140/90 mmHg:</strong> Treat all adults regardless of CVD risk estimate.</li>
+    </ul>
+
+    <h3>Primary Prevention &amp; Dyslipidemia (2026 ACC/AHA Guideline — based on 10-year PREVENT-ASCVD risk)</h3>
+    <ul>
+      <li><strong>Low (&lt;3% risk):</strong> Health behavior counseling. If LDL-C 160–189 mg/dL or 30-year ASCVD risk is &ge;10%, consider moderate-intensity statin therapy.</li>
+      <li><strong>Borderline (3% to &lt;5% risk):</strong> Health behavior counseling. Engage in risk-benefit discussion about pharmacotherapy; consider risk enhancers to personalize the decision. If moderate-intensity statin therapy is initiated, target a &ge;30% LDL-C reduction with a goal of LDL-C &lt;100 mg/dL and non-HDL-C &lt;130 mg/dL. If shared decision-making does not produce a clear treatment path, consider CAC assessment.</li>
+      <li><strong>Intermediate (5% to &lt;10% risk):</strong> Health behavior counseling. Start moderate- to high-intensity statin therapy, targeting a &ge;30% LDL-C reduction with a goal of LDL-C &lt;100 mg/dL and non-HDL-C &lt;130 mg/dL. If uncertainty remains regarding whether to initiate therapy or its appropriate intensity, consider CAC assessment.</li>
+      <li><strong>High (&ge;10% risk):</strong> Health behavior counseling. Start high-intensity statin therapy, targeting a &ge;50% LDL-C reduction with a goal of LDL-C &lt;70 mg/dL and non-HDL-C &lt;100 mg/dL. If goals are not achieved on maximally tolerated statin therapy, additional therapies (e.g., ezetimibe, PCSK9 inhibitors, bempedoic acid) may be necessary.</li>
+    </ul>
+
+    <p><strong>Groups Recommended Lipid-Lowering Therapy Regardless of Calculated Risk:</strong></p>
+    <ul>
+      <li>Established clinical ASCVD.</li>
+      <li>LDL-C &ge;190 mg/dL.</li>
+      <li>Aged 40–75 with diabetes, chronic kidney disease stage 3 or higher, or HIV on stable combination antiretroviral therapy.</li>
+    </ul>
+
+    <h3>Statin Therapy Options</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Statin Intensity</th>
+          <th>Taken Daily, Average LDL Lowering Effect</th>
+          <th>Medication Options</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>High-intensity therapy</td><td>Approximately &ge;50%</td><td>Atorvastatin 40–80 mg; Rosuvastatin 20–40 mg</td></tr>
+        <tr><td>Moderate-intensity therapy</td><td>Approximately 30% to &lt;50%</td><td>Atorvastatin 10–20 mg; Rosuvastatin 5–10 mg; Simvastatin 20–40 mg; Pravastatin 40–80 mg; Lovastatin 40–80 mg; Fluvastatin XL 80 mg; Fluvastatin 40 mg twice daily; Pitavastatin 1–4 mg</td></tr>
+        <tr><td>Low-intensity therapy</td><td>Approximately &lt;30%</td><td>Simvastatin 10 mg; Pravastatin 10–20 mg; Lovastatin 20 mg; Fluvastatin 20–40 mg; Pitavastatin 1 mg</td></tr>
+      </tbody>
+    </table>
+  </section>
+</body>
+</html>
