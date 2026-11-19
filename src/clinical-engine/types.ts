@@ -197,6 +197,8 @@ export interface FamilyHistoryData {
   notes: string;
 }
 
+export type PriorStopCategory = 'INTOLERANCE_OR_ALLERGY' | 'SUBOPTIMAL_EFFICACY';
+
 export interface PriorFailedTreatment {
   id: string;
   treatmentKey:
@@ -211,6 +213,12 @@ export interface PriorFailedTreatment {
     | 'OTHER';
   customName: string;
   reasonStopped: string;
+  /**
+   * הבחנה קלינית:
+   * - INTOLERANCE_OR_ALLERGY (ברירת מחדל): תופעת לוואי פוסלת / אלרגיה / אי-סבילות -> התכשיר מסונן מרשימת התרופות המתאימות.
+   * - SUBOPTIMAL_EFFICACY: תגובה חלקית בלבד במינון קבוע (למשל מקרה 1 תחת Activelle) -> אינו התווית נגד רפואית, אלא מוביל לדירוג גבוה יותר למשטר עורי ניתן לטיטרציה.
+   */
+  stopReasonCategory?: PriorStopCategory;
 }
 
 export interface PatientPreferencesData {
@@ -432,10 +440,52 @@ export interface TestosteroneHsddOption {
   patientInstructionsHebrew: string;
 }
 
+export interface TailoredLifestyleRecommendation {
+  id: string;
+  domainHebrew: string;
+  priority: 'HIGH' | 'ROUTINE';
+  recommendationHebrew: string;
+  patientInstructionHebrew: string;
+  sourceCitation: string;
+}
+
+export interface ComplementaryTherapyOption {
+  id:
+    | 'comp_cbt_menos'
+    | 'comp_clinical_hypnosis'
+    | 'comp_mindfulness_mbi'
+    | 'comp_acupuncture';
+  recommended: boolean;
+  titleHebrew: string;
+  evidenceLevelHebrew: string;
+  targetSymptomsHebrew: string;
+  protocolHebrew: string;
+  clinicalNotesHebrew: string;
+  patientInstructionsHebrew: string;
+  sourceCitation: string;
+}
+
+export interface HerbalBotanicalGuidanceItem {
+  id: 'herb_black_cohosh' | 'herb_isoflavones_red_clover' | 'herb_st_johns_wort';
+  safetyStatus: 'CAUTIOUS_OPTION' | 'AVOID_INTERACTIONS' | 'CONTRAINDICATED_FOR_PATIENT';
+  titleHebrew: string;
+  evidenceSummaryHebrew: string;
+  safetyAndInteractionsHebrew: string;
+  sourceCitation: string;
+}
+
+export interface HolisticCareSuite {
+  lifestyleItems: TailoredLifestyleRecommendation[];
+  complementaryTherapies: ComplementaryTherapyOption[];
+  herbalOverviewNoteHebrew: string;
+  herbalItems: HerbalBotanicalGuidanceItem[];
+}
+
 export interface SelectedTreatmentPlan {
   selectedPrimaryOptionId: string;
-  selectedGsmOptionIds: string[]; // בחירה מרובה של תוספות מקומיות (למשל וגיפם + תכשירי לחות!)
-  includeTestosterone: boolean;   // מופרד לחלוטין מטיפול מקומי ל-GSM
+  selectedGsmOptionIds: string[];          // בחירה מרובה של תוספות מקומיות (למשל וגיפם + תכשירי לחות!)
+  selectedComplementaryIds?: string[];     // טיפולים משלימים מוכחים שנבחרו (CBT, היפנוזה קלינית, מיינדפולנס, דיקור)
+  includeTestosterone: boolean;            // מופרד לחלוטין מטיפול מקומי ל-GSM (ומיועד לשלב המעקב לאחר מיצוי E2+GSM)
   selectionRationaleTags: string[];
   selectionRationaleFreeText: string;
   stage2PatientInstructionsFreeText: string;
@@ -453,7 +503,14 @@ export interface Stage2Recommendations {
   rankedOptions: TreatmentOptionCard[];         // אך ורק אפשרויות מתאימות ובטוחות למטופלת!
   excludedReasonsAudit: string[];               // תיעוד שקיפות מנוע למה סוננו תרופות שנפסלו
   localGsmOptions: LocalGsmOption[];            // תכשירי לחות מופרדים מאינטררוזה, אוספמיפן ואסטרוגן נרתיקי
-  testosteroneOption?: TestosteroneHsddOption;  // מופרד לחלוטין מ-GSM (מוצג רק אם מותר למטופלת)
+  /**
+   * לפי NICE 2024 / BMS / IMS / ACOG 2026 / Srebnik:
+   * בשלב 2 (התחלת טיפול ראשונית) טסטוסטרון סיסטמי אינו ניתן כקו ראשון, אלא קודם מאזנים אסטרוגן עורי (שלא מעלה SHBG) + GSM;
+   * רק בשלב 3 (מעקב), אם HSDD ממשיך להטריד למרות טיפול מיטבי – נפתחת אפשרות הטסטוסטרון (testosteroneOption בשלב 3).
+   */
+  testosteroneOption?: TestosteroneHsddOption;
+  hsddStepwiseNoteHebrew?: string;
+  holisticCare: HolisticCareSuite;
   patientExpectationPoints: string[];
   followUpIntervalMonths: number;
   emrSummaryText: string;
@@ -519,6 +576,7 @@ export interface LongitudinalVisit {
   selectedFollowUpOptionId?: string;
   switchedToOptionId?: string;
   selectedGsmOptionIds?: string[];
+  selectedComplementaryIds?: string[];
   includeTestosterone?: boolean;
   selectionRationaleTags?: string[];
   selectionRationaleFreeText?: string;

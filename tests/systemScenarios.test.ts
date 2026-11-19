@@ -41,7 +41,7 @@ function assertCondition(condition: unknown, message: string): asserts condition
 /**
  * @testId TC-SYS-01
  * @spec docs/TEST_SPECIFICATION.md#tc-sys-01
- * @sources knowledge/markdown/magid-course/practical-menopause-course-session5-cases.md, knowledge/summaries/08-gsm-sexual-health-and-non-hormonal-therapies.md
+ * @sources knowledge/markdown/magid-course/practical-menopause-course-session5-cases.md, knowledge/markdown/red-whale/02-nice-guideline-menopause-2024.md, knowledge/markdown/magid-course/acog-cpg-13-vasomotor-sleep-mood-2026.md, knowledge/markdown/magid-course/mht-in-brca-carriers-srebnik.md
  */
 export function testTcSys01_SuboptimalActivelleMultiGsmAndTestosterone(): void {
   const s1 = createBlankStage1Data();
@@ -52,6 +52,8 @@ export function testTcSys01_SuboptimalActivelleMultiGsmAndTestosterone(): void {
   s1.bmi = 26.5;
   s1.bpSystolic = 110;
   s1.bpDiastolic = 73;
+  s1.isSmoker = false;
+  s1.exerciseRegular = true;
   s1.cyclePattern = 'AMENORRHEA_OVER_12_MONTHS';
   s1.monthsSinceLastPeriod = 12;
   s1.familyHistory.familyPrematureCvd = true;
@@ -59,6 +61,7 @@ export function testTcSys01_SuboptimalActivelleMultiGsmAndTestosterone(): void {
     isManuallyExpanded: false,
     totalCholesterolMgDl: 220,
     hdlCholesterolMgDl: 55,
+    ldlCholesterolMgDl: 145,
     egfrMlMin: 92
   };
   s1.symptoms['1'] = { severity: 3, frequency: 3, importance: 4 };  // גלי חום
@@ -67,44 +70,71 @@ export function testTcSys01_SuboptimalActivelleMultiGsmAndTestosterone(): void {
   s1.symptoms['15'] = { severity: 2, importance: 3 };              // יובש נרתיקי (GSM)
   s1.preferences.priorFailedTreatments = [
     {
-      id: 'fail_activelle',
+      id: 'subopt_activelle',
       treatmentKey: 'ORAL_COMBINED_NETA',
       customName: 'אקטיבל',
-      reasonStopped: 'חוסר שליטה מספקת בגלי חום ויקיצות לילה'
+      reasonStopped: 'הקלה חלקית בלבד בגלי חום ויקיצות ב-03:00 במינון קבוע של 1 מ"ג',
+      stopReasonCategory: 'SUBOPTIMAL_EFFICACY'
     }
   ];
 
+  // 1. אימות פתיחת מחשבון AHA PREVENT™ וחישוב 10 + 30 שנה
   const prevent = calculateAhaPreventRisk(s1);
   assertCondition(prevent.shouldAutoOpen === true, 'PREVENT must auto-open on premature family CVD');
   assertCondition(prevent.hasCompleteLabInputs === true, 'PREVENT must calculate 10y & 30y scores');
   assertCondition((prevent.risk30YearTotalCvd || 0) > (prevent.risk10YearTotalCvd || 0), '30y CVD > 10y CVD');
 
+  // 2. אימות שאקטיבל אינו פסול רפואית (אין התווית נגד באישה בריאה בת 51!), אך ג׳ל אסטרדיול עורי + אוטרוגסטן מדורג #1!
   const eligibleArsenal = getEligibleArsenalForPatient(s1);
   assertCondition(
-    !eligibleArsenal.some((d) => d.id === 'activelle_eviana_novofem'),
-    'Previously failed Activelle must be filtered out of eligible arsenal'
+    eligibleArsenal.some((d) => d.id === 'activelle_eviana_novofem'),
+    'Activelle has NO medical contraindication in a healthy 51yo when prior stop was SUBOPTIMAL_EFFICACY!'
   );
 
   const recs = formulateTreatment(s1);
   assertCondition(
     recs.rankedOptions[0].id === 'opt_transdermal_gel_body_identical',
-    'Transdermal E2 gel + bedtime Utrogestan should rank #1'
+    'Transdermal E2 gel + bedtime Utrogestan must rank #1 above oral MHT'
+  );
+  const oralCard = recs.rankedOptions.find((o) => o.id === 'opt_oral_mht_regimen');
+  assertCondition(
+    oralCard?.suitabilityBadge === 'CONDITIONAL',
+    'Oral MHT should remain medically available as CONDITIONAL (lower ranked due to prior 1mg suboptimal control, sleep & SHBG)'
   );
 
-  // אימות הפרדת תכשירי לחות מאינטררוזה ובחירה מרובה של תוספות מקומיות + הפרדת טסטוסטרון!
+  // 3. אימות הפרדת תכשירי לחות מאינטררוזה ובחירה מרובה של תוספות מקומיות ל-GSM
   const gsmIds = recs.localGsmOptions.map((g) => g.id);
   assertCondition(gsmIds.includes('gsm_moisturizers_lubricants'), 'Moisturizers must be a distinct GSM option');
   assertCondition(gsmIds.includes('gsm_intrarosa_prasterone'), 'Intrarosa must be separated from moisturizers');
   assertCondition(gsmIds.includes('gsm_vaginal_estrogen'), 'Vaginal estrogen must be available');
-  assertCondition(recs.testosteroneOption !== undefined, 'Testosterone must be a separate top-level option');
-  assertCondition(recs.testosteroneOption?.recommended === true, 'Testosterone must be flagged recommended for HSDD');
+
+  // 4. אימות תזמון הטסטוסטרון לפי הקווים המנחים: בשלב 2 טסטוסטרון אינו מוצע כקו ראשון, אלא מוצגת הערת הניהול הדו-שלבי!
+  assertCondition(
+    recs.testosteroneOption === undefined,
+    'Systemic Testosterone must NOT be offered as a first-line Stage 2 initiation before optimizing transdermal E2 + GSM!'
+  );
+  assertCondition(
+    Boolean(recs.hsddStepwiseNoteHebrew?.includes('שלב 3')),
+    'Stage 2 must explain the two-step HSDD rule (optimize transdermal E2 + GSM first, evaluate Testosterone in Stage 3 follow-up)'
+  );
+
+  // אימות התאמת אורח החיים למטופלת שאינה מעשנת ופעילה גופנית
+  assertCondition(
+    !recs.holisticCare.lifestyleItems.some((l) => l.id === 'life_smoking_cessation'),
+    'Non-smoker must NOT receive smoking cessation recommendation'
+  );
+  assertCondition(
+    recs.holisticCare.lifestyleItems.some((l) => l.id === 'life_physical_activity'),
+    'Holistic care must include personalized exercise guidance'
+  );
 
   const plan: SelectedTreatmentPlan = {
     selectedPrimaryOptionId: recs.rankedOptions[0].id,
     selectedGsmOptionIds: ['gsm_vaginal_estrogen', 'gsm_moisturizers_lubricants'],
-    includeTestosterone: true,
+    selectedComplementaryIds: ['comp_cbt_menos'],
+    includeTestosterone: false,
     selectionRationaleTags: ['מענה משולב להפרעות שינה (נטילת ערב)'],
-    selectionRationaleFreeText: 'מעבר מאקטיבל לג׳ל + אוטרוגסטן + שילוב מקומי כפול וטסטוסטרון',
+    selectionRationaleFreeText: 'מעבר מאקטיבל לג׳ל + אוטרוגסטן + שילוב מקומי כפול',
     stage2PatientInstructionsFreeText: 'למרוח את הג׳ל בבוקר וליטול אוטרוגסטן לפני השינה.',
     selectedAtIso: new Date().toISOString()
   };
@@ -112,17 +142,57 @@ export function testTcSys01_SuboptimalActivelleMultiGsmAndTestosterone(): void {
   const s2Output = buildStage2PatientInstructions(s1, recs, plan);
   assertCondition(s2Output.formattedPlainText.includes('וגיפם'), 'Stage 2 output must include selected vaginal estrogen');
   assertCondition(s2Output.formattedPlainText.includes('Replens'), 'Stage 2 output must include co-selected moisturizer');
-  assertCondition(s2Output.formattedPlainText.includes('טסטוסטרון'), 'Stage 2 output must include Testosterone');
   assertCondition(
     s2Output.formattedPlainText.includes('למרוח את הג׳ל בבוקר'),
     'Stage 2 output must include physician free text'
+  );
+
+  // 5. שלב 3 (מעקב כעבור 3 חודשים): גלי החום והשינה התאזנו תחת E2 עורי + GSM, אך ירידת החשק המיני (HSDD) נמשכת -> טסטוסטרון נפתח ומומלץ!
+  const followUpSym = {
+    ...s1.symptoms,
+    '1': { severity: 0 as const, frequency: 0 as const, importance: 4 as const },
+    '7': { severity: 1 as const, importance: 4 as const },
+    '15': { severity: 0 as const, importance: 3 as const },
+    '13': { severity: 3 as const, importance: 4 as const } // HSDD ממשיך להטריד למרות איזון E2 + GSM!
+  };
+
+  const fuSuite = evaluateFollowUpDecisionSuite({
+    stage1Data: s1,
+    selectedPlan: plan,
+    monthsSinceStart: 3,
+    followUpSymptoms: followUpSym,
+    newlyStartedGlp1: false,
+    newlyStartedInteractingMed: '',
+    newContraindicationEmerged: false,
+    veozaAltAstNormal: 'NOT_APPLICABLE',
+    reportedSideEffectIds: [],
+    hasNewBleeding: false,
+    isBleedingHeavyOrProlonged: false,
+    hasRecentDoseChangeIn3Months: false
+  });
+
+  assertCondition(
+    fuSuite.testosteroneOption !== undefined && fuSuite.testosteroneOption.recommended === true,
+    'Stage 3 Follow-Up MUST unlock & recommend transdermal Testosterone when distressing HSDD persists despite transdermal E2 + GSM!'
+  );
+
+  const s3Out = buildStage3PatientInstructions(s1, {
+    updatedRegimenText: fuSuite.rankedFollowUpOptions[0].titleHebrew,
+    selectedOption: fuSuite.rankedFollowUpOptions[0],
+    includeTestosterone: true,
+    testosteroneOption: fuSuite.testosteroneOption,
+    medicationAction: 'CONTINUE_SAME'
+  });
+  assertCondition(
+    s3Out.formattedPlainText.includes('טסטוסטרון') && s3Out.formattedPlainText.includes('SHBG'),
+    'Stage 3 patient output must include Testosterone dosing & SHBG/Testosterone blood monitoring'
   );
 }
 
 /**
  * @testId TC-SYS-02
  * @spec docs/TEST_SPECIFICATION.md#tc-sys-02
- * @sources knowledge/markdown/magid-course/practical-menopause-course-session5-cases.md, knowledge/summaries/07-poi-early-menopause-and-contraception.md, knowledge/summaries/04-progestogen-selection-and-endometrial-protection.md
+ * @sources knowledge/markdown/magid-course/practical-menopause-course-session5-cases.md, knowledge/markdown/magid-course/asrm-eshre-ims-poi-guideline-2024.md, knowledge/markdown/red-whale/05-hrt-regimens-and-progestogen-doses.md
  */
 export function testTcSys02_EarlyMenopauseProportionalDoseAndStopGuard(): void {
   const s1 = createBlankStage1Data();
@@ -143,13 +213,15 @@ export function testTcSys02_EarlyMenopauseProportionalDoseAndStopGuard(): void {
       id: 'f1',
       treatmentKey: 'ORAL_FEMOSTON',
       customName: 'פמוסטון קונטי',
-      reasonStopped: 'דימומים מתמשכים וכאבי ראש'
+      reasonStopped: 'דימומים מתמשכים וכאבי ראש',
+      stopReasonCategory: 'INTOLERANCE_OR_ALLERGY'
     },
     {
       id: 'f2',
       treatmentKey: 'EVOREL_PATCH',
       customName: 'אוורל קונטי',
-      reasonStopped: 'פריחה עורית מגרדת'
+      reasonStopped: 'פריחה עורית מגרדת',
+      stopReasonCategory: 'INTOLERANCE_OR_ALLERGY'
     }
   ];
 
@@ -166,10 +238,10 @@ export function testTcSys02_EarlyMenopauseProportionalDoseAndStopGuard(): void {
   );
   assertCondition(
     !recs.rankedOptions.some((o) => o.id === 'opt_transdermal_patch_regimen'),
-    'Patch option must be strictly excluded due to patch adhesive sensitivity & prior failure'
+    'Patch option must be strictly excluded due to patch adhesive sensitivity & prior intolerance'
   );
   const eligibleDrugs = getEligibleArsenalForPatient(s1);
-  assertCondition(!eligibleDrugs.some((d) => d.id === 'femoston_family'), 'Failed Femoston must be excluded');
+  assertCondition(!eligibleDrugs.some((d) => d.id === 'femoston_family'), 'Intolerated Femoston must be excluded');
 
   const gelCard = recs.rankedOptions.find((o) => o.id === 'opt_transdermal_gel_body_identical');
   assertCondition(Boolean(gelCard), 'Transdermal gel option must be available');
@@ -210,7 +282,7 @@ export function testTcSys02_EarlyMenopauseProportionalDoseAndStopGuard(): void {
 /**
  * @testId TC-SYS-03
  * @spec docs/TEST_SPECIFICATION.md#tc-sys-03
- * @sources knowledge/markdown/magid-course/practical-menopause-course-session5-cases.md, knowledge/summaries/02-initial-assessment-screening-and-completeness-gate.md, knowledge/summaries/06-cancer-risks-osteoporosis-and-brca-carriers.md
+ * @sources knowledge/markdown/magid-course/practical-menopause-course-session5-cases.md, knowledge/markdown/magid-course/ima-preventive-medicine-guidelines-2022.md, knowledge/markdown/red-whale/07-hrt-and-breast-cancer-risk.md
  */
 export function testTcSys03_BenignBreastBiopsyMaternalCancer70AndAshkenaziBrca(): void {
   const s1 = createBlankStage1Data();
@@ -257,7 +329,7 @@ export function testTcSys03_BenignBreastBiopsyMaternalCancer70AndAshkenaziBrca()
 /**
  * @testId TC-SYS-04
  * @spec docs/TEST_SPECIFICATION.md#tc-sys-04
- * @sources knowledge/markdown/magid-course/practical-menopause-course-session5-cases.md, knowledge/summaries/09-unscheduled-bleeding-side-effects-interactions-and-stopping.md
+ * @sources knowledge/markdown/magid-course/practical-menopause-course-session5-cases.md, knowledge/markdown/red-whale/11-problematic-bleeding-on-hrt.md, knowledge/markdown/magid-course/bleeding-and-side-effects-under-mht-freiberg.md
  */
 export function testTcSys04_CardiometabolicObesityAndStage3BmsBleedingCalculator(): void {
   const s1 = createBlankStage1Data();
@@ -347,7 +419,7 @@ export function testTcSys04_CardiometabolicObesityAndStage3BmsBleedingCalculator
 /**
  * @testId TC-SYS-05
  * @spec docs/TEST_SPECIFICATION.md#tc-sys-05
- * @sources knowledge/markdown/magid-course/practical-menopause-course-session5-cases.md, knowledge/summaries/07-poi-early-menopause-and-contraception.md
+ * @sources knowledge/markdown/magid-course/practical-menopause-course-session5-cases.md, knowledge/markdown/red-whale/hebrew-summary-perimenopause-contraception.md, knowledge/markdown/red-whale/08-hrt-and-risk-of-vte.md
  */
 export function testTcSys05_ChcOver50SuppressedTshMimicAndFamilyVte(): void {
   const s1 = createBlankStage1Data();
@@ -394,7 +466,7 @@ export function testTcSys05_ChcOver50SuppressedTshMimicAndFamilyVte(): void {
 /**
  * @testId TC-SYS-06
  * @spec docs/TEST_SPECIFICATION.md#tc-sys-06
- * @sources knowledge/markdown/magid-course/practical-menopause-course-session5-cases.md, knowledge/markdown/magid-course/mdcalc-10491-aha-prevent-calculator.md, knowledge/summaries/05-cardiovascular-vte-and-metabolic-risk.md
+ * @sources knowledge/markdown/magid-course/practical-menopause-course-session5-cases.md, knowledge/markdown/magid-course/mdcalc-10491-aha-prevent-calculator.md, knowledge/markdown/magid-course/acog-cpg-13-vasomotor-sleep-mood-2026.md
  */
 export function testTcSys06_LatePostmenopauseAge62PreventAndVeozaMonitoring(): void {
   const s1 = createBlankStage1Data();
@@ -434,6 +506,10 @@ export function testTcSys06_LatePostmenopauseAge62PreventAndVeozaMonitoring(): v
   assertCondition(
     recs.rankedOptions[0].id === 'opt_nonhormonal_nk3_veoza_lynkuet',
     'Non-hormonal Veoza should rank #1 for newly presenting 62yo 11y post-FMP with CV risk factors'
+  );
+  assertCondition(
+    recs.holisticCare.lifestyleItems.some((l) => l.id === 'life_smoking_cessation' && l.priority === 'HIGH'),
+    'Active smoker must receive high-priority smoking cessation lifestyle recommendation'
   );
 
   // בדיקת מעקב שלב 3: עליית ALT/AST מעל 3x ULN תחת ויוזה -> ויוזה נפסלת ומסוננת מיידית!
@@ -479,7 +555,7 @@ export function testTcSys06_LatePostmenopauseAge62PreventAndVeozaMonitoring(): v
 /**
  * @testId TC-SYS-07
  * @spec docs/TEST_SPECIFICATION.md#tc-sys-07
- * @sources knowledge/markdown/magid-course/practical-menopause-course-session5-cases.md, knowledge/summaries/10-israeli-formulary-clinical-cases-and-design-alignment.md
+ * @sources knowledge/markdown/magid-course/practical-menopause-course-session5-cases.md, knowledge/markdown/magid-course/progestogen-selection-in-mht-srebnik.md, knowledge/markdown/magid-course/ima-preventive-medicine-guidelines-2022.md
  */
 export function testTcSys07_SolitaryKidneyExpiredMirena8Years(): void {
   const s1 = createBlankStage1Data();
@@ -518,24 +594,30 @@ export function testTcSys07_SolitaryKidneyExpiredMirena8Years(): void {
 
   const s1Out = buildStage1PatientInstructions(s1);
   assertCondition(s1Out.formattedPlainText.includes('מירנה'), 'Stage 1 output must instruct Mirena replacement');
-  assertCondition(s1Out.formattedPlainText.includes('ממוגרפיה'), 'Stage 1 output must instruct biennial mammogram (age 53)');
+  assertCondition(
+    s1Out.formattedPlainText.includes('ממוגרפיה דו-שנתית'),
+    'Average-risk 53yo must receive biennial mammography recommendation'
+  );
   assertCondition(s1Out.formattedPlainText.includes('FIT'), 'Stage 1 output must instruct colorectal FIT screening');
 }
 
 /**
  * @testId TC-SYS-08
  * @spec docs/TEST_SPECIFICATION.md#tc-sys-08
- * @sources knowledge/markdown/red-whale/14-drug-interactions-with-hrt.md, knowledge/markdown/red-whale/02-nice-guideline-menopause-2024.md, knowledge/summaries/08-gsm-sexual-health-and-non-hormonal-therapies.md
+ * @sources knowledge/markdown/magid-course/ima-preventive-medicine-guidelines-2022.md, knowledge/markdown/magid-course/bms-consensus-non-hormonal-treatments-2026.md, knowledge/markdown/magid-course/acog-cpg-13-vasomotor-sleep-mood-2026.md
  */
 export function testTcSys08_BreastCancerTamoxifenParoxetineBlockAndGsmSeparation(): void {
   const s1 = createBlankStage1Data();
   s1.fullName = 'אורלי דוד – סרטן שד וטמוקסיפן';
-  s1.age = 48;
+  s1.age = 52; // בטווח 50–74 – לבדיקת איסור המלצת ממוגרפיה דו-שנתית שגרתית למחלימת סרטן שד!
+  s1.ethnicity = 'ASHKENAZI';
   s1.weightKg = 65;
   s1.heightCm = 165;
   s1.bmi = 23.9;
   s1.bpSystolic = 120;
   s1.bpDiastolic = 76;
+  s1.mammographyStatus = 'NOT_PERFORMED';
+  s1.familyHistory.brcaStatus = 'NOT_TESTED';
   s1.medicalHistory.hasMalignancyOrBreastHistory = true;
   s1.medicalHistory.breastCancerHistory = true;
   s1.medicalHistory.breastCancerReceptor = 'HR_POSITIVE';
@@ -551,11 +633,33 @@ export function testTcSys08_BreastCancerTamoxifenParoxetineBlockAndGsmSeparation
   assertCondition(gate.isPassed === true, 'Breast cancer patient must pass gate into Stage 2 non-hormonal pathway');
   assertCondition(gate.systemicMhtContraindicated === true, 'Systemic MHT must be marked contraindicated');
 
+  // 1. אימות שמחלימת סרטן שד בת 52 אינה מקבלת לעולם המלצה ל"ממוגרפיה דו-שנתית", אלא מעקב אונקולוגי שנתי מותאם אישית + פאנל גנטי מלא!
+  assertCondition(
+    !gate.basketRecommendations.some((b) => b.includes('ממוגרפיה דו-שנתית')),
+    'Breast cancer survivor must NEVER receive routine biennial (דו-שנתית) screening mammogram!'
+  );
+  assertCondition(
+    gate.basketRecommendations.some((b) => b.includes('ממוגרפיה שנתית') && b.includes('אונקולוג')),
+    'Breast cancer survivor must receive personalized annual oncology breast surveillance!'
+  );
+  assertCondition(
+    gate.basketRecommendations.some((b) => b.includes('פאנל גנים')),
+    'Breast cancer patient with untested genetics must be referred for full oncogenetic panel (not healthy carrier founder screen)'
+  );
+
+  const s1Out = buildStage1PatientInstructions(s1);
+  assertCondition(
+    !s1Out.formattedPlainText.includes('דו-שנתית') && s1Out.formattedPlainText.includes('ממוגרפיה שנתית'),
+    'Stage 1 patient output for breast cancer survivor must specify annual oncology breast imaging, never biennial!'
+  );
+
+  // 2. אימות התרעת אינטראקציה קריטית Tamoxifen + Paroxetine (CYP2D6)
   const interactions = checkDrugInteractions(s1);
   const tamAlert = interactions.find((i) => i.id === 'tamoxifen');
   assertCondition(tamAlert?.severity === 'CRITICAL', 'Tamoxifen + Paroxetine must raise CRITICAL CYP2D6 alert');
   assertCondition(Boolean(tamAlert?.blocksParoxetineFluoxetine), 'Must explicitly block Paroxetine/Fluoxetine');
 
+  // 3. אימות אפס הורמונים סיסטמיים, הפרדת לחות נרתיקית, המלצת היפנוזה קלינית ו-CBT, ופסילת צמחי מרפא אסורים!
   const recs = formulateTreatment(s1);
   assertCondition(
     recs.rankedOptions.every((o) => o.category === 'NON_HORMONAL_SYSTEMIC'),
@@ -565,18 +669,46 @@ export function testTcSys08_BreastCancerTamoxifenParoxetineBlockAndGsmSeparation
     !recs.localGsmOptions.some((g) => g.id === 'gsm_intrarosa_prasterone' || g.id === 'gsm_ospemifene_oral'),
     'Intrarosa and Ospemifene must be excluded in breast cancer'
   );
-  assertCondition(
-    recs.testosteroneOption === undefined,
-    'Systemic Testosterone option must be hidden in HR+ breast cancer'
-  );
+  assertCondition(recs.testosteroneOption === undefined, 'Systemic Testosterone must be hidden in breast cancer');
+
   const moist = recs.localGsmOptions.find((g) => g.id === 'gsm_moisturizers_lubricants');
   assertCondition(Boolean(moist) && moist?.recommended === true, 'Non-hormonal vaginal moisturizers must be recommended #1');
+
+  const hypnosis = recs.holisticCare.complementaryTherapies.find((c) => c.id === 'comp_clinical_hypnosis');
+  const cbt = recs.holisticCare.complementaryTherapies.find((c) => c.id === 'comp_cbt_menos');
+  assertCondition(
+    Boolean(hypnosis?.recommended) && Boolean(cbt?.recommended),
+    'Clinical Hypnosis and CBT-MENOS must be recommended for breast cancer VMS!'
+  );
+  assertCondition(
+    recs.holisticCare.herbalItems.every((h) => h.safetyStatus === 'CONTRAINDICATED_FOR_PATIENT'),
+    'Black Cohosh, Soy/Red Clover supplements, and St John’s Wort must ALL be marked CONTRAINDICATED_FOR_PATIENT in breast cancer + Tamoxifen!'
+  );
+  assertCondition(
+    !recs.patientExpectationPoints.some((p) => p.includes('הכתמות קלות שכיחות')),
+    'Non-hormonal pathway must NOT output HRT spotting expectations!'
+  );
+
+  const s2Out = buildStage2PatientInstructions(s1, recs, {
+    selectedPrimaryOptionId: recs.rankedOptions[0].id,
+    selectedGsmOptionIds: ['gsm_moisturizers_lubricants'],
+    selectedComplementaryIds: ['comp_clinical_hypnosis', 'comp_cbt_menos'],
+    includeTestosterone: false,
+    selectionRationaleTags: [],
+    selectionRationaleFreeText: '',
+    stage2PatientInstructionsFreeText: '',
+    selectedAtIso: new Date().toISOString()
+  });
+  assertCondition(
+    s2Out.formattedPlainText.includes('היפנוזה קלינית') && s2Out.formattedPlainText.includes('תזונה ים-תיכונית'),
+    'Stage 2 patient instructions must include selected Clinical Hypnosis and Mediterranean nutrition guidance'
+  );
 }
 
 /**
  * @testId TC-SYS-09
  * @spec docs/TEST_SPECIFICATION.md#tc-sys-09
- * @sources knowledge/markdown/red-whale/14-drug-interactions-with-hrt.md, knowledge/summaries/09-unscheduled-bleeding-side-effects-interactions-and-stopping.md
+ * @sources knowledge/markdown/red-whale/14-drug-interactions-with-hrt.md, knowledge/markdown/red-whale/03-different-types-of-hrt.md
  */
 export function testTcSys09_PeanutAllergyLamotrigineAndStage3Glp1Switch(): void {
   const s1 = createBlankStage1Data();
@@ -644,7 +776,7 @@ export function testTcSys09_PeanutAllergyLamotrigineAndStage3Glp1Switch(): void 
 /**
  * @testId TC-SYS-10
  * @spec docs/TEST_SPECIFICATION.md#tc-sys-10
- * @sources knowledge/summaries/02-initial-assessment-screening-and-completeness-gate.md, knowledge/summaries/09-unscheduled-bleeding-side-effects-interactions-and-stopping.md
+ * @sources knowledge/markdown/red-whale/04-hrt-starting-troubleshooting-stopping.md, knowledge/markdown/magid-course/ima-preventive-medicine-guidelines-2022.md
  */
 export function testTcSys10_UninvestigatedPmbHardBlockAndCompleteResetClean(): void {
   // חלק א': חסימה מוחלטת בדימום פוסט-מנופאוזלי שטרם בורר (PMB)
@@ -663,7 +795,35 @@ export function testTcSys10_UninvestigatedPmbHardBlockAndCompleteResetClean(): v
     'Stage 1 output must include physician free text'
   );
 
-  // חלק ב': בדיקת ניקוי 100% של כל השדות בפתיחת תיק מטופלת חדשה (איפוס)
+  // חלק ב': התאמת הנחיות לאחר כריתת רחם שלמה שפירה (ללא המלצת Pap/HPV שגרתית וללא אזהרת הכתמות רחמיות!)
+  const hyst = createBlankStage1Data();
+  hyst.age = 54;
+  hyst.weightKg = 64;
+  hyst.heightCm = 164;
+  hyst.bmi = 23.8;
+  hyst.bpSystolic = 118;
+  hyst.bpDiastolic = 75;
+  hyst.hadHysterectomy = true;
+  hyst.cervixConserved = false;
+  hyst.papHpvStatus = 'NOT_PERFORMED';
+  hyst.mammographyStatus = 'UP_TO_DATE_NORMAL';
+  hyst.fitColorectalStatus = 'UP_TO_DATE_NORMAL';
+  hyst.glucoseLipidsStatus = 'NORMAL';
+  hyst.symptoms['1'] = { severity: 3, frequency: 3, importance: 4 };
+
+  const hystGate = evaluateCompletenessGate(hyst);
+  assertCondition(
+    !hystGate.basketRecommendations.some((b) => b.includes('hrHPV')),
+    'Total benign hysterectomy without cervix must NOT prompt routine cervical hrHPV screening'
+  );
+  const hystRecs = formulateTreatment(hyst);
+  assertCondition(hystRecs.regimenType === 'ESTROGEN_ONLY', 'Post-hysterectomy without endometriosis must get ESTROGEN_ONLY');
+  assertCondition(
+    !hystRecs.patientExpectationPoints.some((p) => p.includes('הכתמות קלות שכיחות ב-3–6 החודשים')),
+    'Hysterectomized woman must NOT be told to expect 3-6m HRT uterine spotting'
+  );
+
+  // חלק ג': בדיקת ניקוי 100% של כל השדות בפתיחת תיק מטופלת חדשה (איפוס)
   const dirtyRecord = createInitialRecord(false);
   dirtyRecord.activeStage = 3;
   dirtyRecord.stage2 = formulateTreatment(dirtyRecord.stage1);
@@ -731,9 +891,11 @@ export const SYSTEM_TEST_SCENARIOS: SystemScenarioDefinition[] = [
     specFile: 'docs/TEST_SPECIFICATION.md',
     knowledgeSources: [
       'knowledge/markdown/magid-course/practical-menopause-course-session5-cases.md',
-      'knowledge/summaries/08-gsm-sexual-health-and-non-hormonal-therapies.md'
+      'knowledge/markdown/red-whale/02-nice-guideline-menopause-2024.md',
+      'knowledge/markdown/magid-course/acog-cpg-13-vasomotor-sleep-mood-2026.md',
+      'knowledge/markdown/magid-course/mht-in-brca-carriers-srebnik.md'
     ],
-    titleHebrew: 'תת-איזון תחת Activelle בגיל 51, סינון תרופה שנכשלה, שילוב מרובה ב-GSM והפרדת טסטוסטרון',
+    titleHebrew: 'הקלה חלקית תחת Activelle בגיל 51 (ללא פסילה רפואית), שילוב מרובה ב-GSM וטסטוסטרון רק בשלב 3',
     run: testTcSys01_SuboptimalActivelleMultiGsmAndTestosterone
   },
   {
@@ -743,10 +905,10 @@ export const SYSTEM_TEST_SCENARIOS: SystemScenarioDefinition[] = [
     specFile: 'docs/TEST_SPECIFICATION.md',
     knowledgeSources: [
       'knowledge/markdown/magid-course/practical-menopause-course-session5-cases.md',
-      'knowledge/summaries/07-poi-early-menopause-and-contraception.md',
-      'knowledge/summaries/04-progestogen-selection-and-endometrial-protection.md'
+      'knowledge/markdown/magid-course/asrm-eshre-ims-poi-guideline-2024.md',
+      'knowledge/markdown/red-whale/05-hrt-regimens-and-progestogen-doses.md'
     ],
-    titleHebrew: 'מנופאוזה מוקדמת בגיל 41 עם כישלון Femoston ופריחה מ-Evorel – הכפלת פרוגסטוגן והגנת הפסקה',
+    titleHebrew: 'מנופאוזה מוקדמת בגיל 41 עם אי-סבילות ל-Femoston ופריחה מ-Evorel – הכפלת פרוגסטוגן והגנת הפסקה',
     run: testTcSys02_EarlyMenopauseProportionalDoseAndStopGuard
   },
   {
@@ -756,7 +918,8 @@ export const SYSTEM_TEST_SCENARIOS: SystemScenarioDefinition[] = [
     specFile: 'docs/TEST_SPECIFICATION.md',
     knowledgeSources: [
       'knowledge/markdown/magid-course/practical-menopause-course-session5-cases.md',
-      'knowledge/summaries/02-initial-assessment-screening-and-completeness-gate.md'
+      'knowledge/markdown/magid-course/ima-preventive-medicine-guidelines-2022.md',
+      'knowledge/markdown/red-whale/07-hrt-and-breast-cancer-risk.md'
     ],
     titleHebrew: 'בת 49 עם סרטן שד לאם בגיל 70 + ביופסיה שפירה ללא אטיפיה וסקר BRCA בסל',
     run: testTcSys03_BenignBreastBiopsyMaternalCancer70AndAshkenaziBrca
@@ -768,7 +931,8 @@ export const SYSTEM_TEST_SCENARIOS: SystemScenarioDefinition[] = [
     specFile: 'docs/TEST_SPECIFICATION.md',
     knowledgeSources: [
       'knowledge/markdown/magid-course/practical-menopause-course-session5-cases.md',
-      'knowledge/summaries/09-unscheduled-bleeding-side-effects-interactions-and-stopping.md'
+      'knowledge/markdown/red-whale/11-problematic-bleeding-on-hrt.md',
+      'knowledge/markdown/magid-course/bleeding-and-side-effects-under-mht-freiberg.md'
     ],
     titleHebrew: 'פרופיל קרדיו-מטבולי (BMI 34.3) + דימום בשלב 3 הפותח מחשבון BMS לסיכון סרטן הרחם',
     run: testTcSys04_CardiometabolicObesityAndStage3BmsBleedingCalculator
@@ -780,7 +944,8 @@ export const SYSTEM_TEST_SCENARIOS: SystemScenarioDefinition[] = [
     specFile: 'docs/TEST_SPECIFICATION.md',
     knowledgeSources: [
       'knowledge/markdown/magid-course/practical-menopause-course-session5-cases.md',
-      'knowledge/summaries/07-poi-early-menopause-and-contraception.md'
+      'knowledge/markdown/red-whale/hebrew-summary-perimenopause-contraception.md',
+      'knowledge/markdown/red-whale/08-hrt-and-risk-of-vte.md'
     ],
     titleHebrew: 'בת 53 תחת CHC (Meliane), דיכוי TSH 0.05 המחקה גלי חום ו-VTE משפחתי',
     run: testTcSys05_ChcOver50SuppressedTshMimicAndFamilyVte
@@ -792,9 +957,10 @@ export const SYSTEM_TEST_SCENARIOS: SystemScenarioDefinition[] = [
     specFile: 'docs/TEST_SPECIFICATION.md',
     knowledgeSources: [
       'knowledge/markdown/magid-course/practical-menopause-course-session5-cases.md',
-      'knowledge/markdown/magid-course/mdcalc-10491-aha-prevent-calculator.md'
+      'knowledge/markdown/magid-course/mdcalc-10491-aha-prevent-calculator.md',
+      'knowledge/markdown/magid-course/acog-cpg-13-vasomotor-sleep-mood-2026.md'
     ],
-    titleHebrew: 'פנייה ראשונה בגיל 62 (11 שנים מווסת) – חישוב PREVENT והפסקת ויוזה בעליית אנזימי כבד',
+    titleHebrew: 'פנייה ראשונה בגיל 62 (11 שנים מווסת) – חישוב PREVENT, גמילה מעישון והפסקת ויוזה בעליית אנזימי כבד',
     run: testTcSys06_LatePostmenopauseAge62PreventAndVeozaMonitoring
   },
   {
@@ -804,7 +970,8 @@ export const SYSTEM_TEST_SCENARIOS: SystemScenarioDefinition[] = [
     specFile: 'docs/TEST_SPECIFICATION.md',
     knowledgeSources: [
       'knowledge/markdown/magid-course/practical-menopause-course-session5-cases.md',
-      'knowledge/summaries/10-israeli-formulary-clinical-cases-and-design-alignment.md'
+      'knowledge/markdown/magid-course/progestogen-selection-in-mht-srebnik.md',
+      'knowledge/markdown/magid-course/ima-preventive-medicine-guidelines-2022.md'
     ],
     titleHebrew: 'בת 53 תורמת כליה עם התקן מירנה פג-תוקף (8 שנים) ודימומים לא סדירים',
     run: testTcSys07_SolitaryKidneyExpiredMirena8Years
@@ -815,10 +982,11 @@ export const SYSTEM_TEST_SCENARIOS: SystemScenarioDefinition[] = [
     specAnchor: 'tc-sys-08',
     specFile: 'docs/TEST_SPECIFICATION.md',
     knowledgeSources: [
-      'knowledge/markdown/red-whale/14-drug-interactions-with-hrt.md',
-      'knowledge/markdown/red-whale/02-nice-guideline-menopause-2024.md'
+      'knowledge/markdown/magid-course/ima-preventive-medicine-guidelines-2022.md',
+      'knowledge/markdown/magid-course/bms-consensus-non-hormonal-treatments-2026.md',
+      'knowledge/markdown/magid-course/acog-cpg-13-vasomotor-sleep-mood-2026.md'
     ],
-    titleHebrew: 'סרטן שד תחת Tamoxifen ו-Paroxetine + GSM קשה – סינון הורמונים, CYP2D6 והפרדת לחות',
+    titleHebrew: 'מחלימת סרטן שד בת 52 תחת Tamoxifen + Paroxetine – מעקב אונקולוגי שנתי, היפנוזה/CBT ופסילת צמחי מרפא',
     run: testTcSys08_BreastCancerTamoxifenParoxetineBlockAndGsmSeparation
   },
   {
@@ -828,7 +996,7 @@ export const SYSTEM_TEST_SCENARIOS: SystemScenarioDefinition[] = [
     specFile: 'docs/TEST_SPECIFICATION.md',
     knowledgeSources: [
       'knowledge/markdown/red-whale/14-drug-interactions-with-hrt.md',
-      'knowledge/summaries/09-unscheduled-bleeding-side-effects-interactions-and-stopping.md'
+      'knowledge/markdown/red-whale/03-different-types-of-hrt.md'
     ],
     titleHebrew: 'אלרגיית בוטנים/סויה + Lamotrigine + התחלת GLP-1 בשלב 3 המעבירה להמלצת מירנה',
     run: testTcSys09_PeanutAllergyLamotrigineAndStage3Glp1Switch
@@ -838,8 +1006,11 @@ export const SYSTEM_TEST_SCENARIOS: SystemScenarioDefinition[] = [
     functionName: 'testTcSys10_UninvestigatedPmbHardBlockAndCompleteResetClean',
     specAnchor: 'tc-sys-10',
     specFile: 'docs/TEST_SPECIFICATION.md',
-    knowledgeSources: ['knowledge/summaries/02-initial-assessment-screening-and-completeness-gate.md'],
-    titleHebrew: 'חסימת בטיחות בדימום PMB שטרם בורר + אימות ניקוי 100% מהשדות באיפוס תיק מטופלת חדשה',
+    knowledgeSources: [
+      'knowledge/markdown/red-whale/04-hrt-starting-troubleshooting-stopping.md',
+      'knowledge/markdown/magid-course/ima-preventive-medicine-guidelines-2022.md'
+    ],
+    titleHebrew: 'חסימת בטיחות בדימום PMB שטרם בורר, התאמה לאחר כריתת רחם + ניקוי 100% באיפוס תיק',
     run: testTcSys10_UninvestigatedPmbHardBlockAndCompleteResetClean
   }
 ];

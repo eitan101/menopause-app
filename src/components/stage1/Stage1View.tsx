@@ -103,6 +103,8 @@ export const Stage1View: React.FC<Stage1ViewProps> = ({
 }) => {
   const [activeSymptomDomain, setActiveSymptomDomain] = useState<'ALL' | ImsSymptomDomainId>('ALL');
   const [newFailedKey, setNewFailedKey] = useState<PriorFailedTreatment['treatmentKey']>('ORAL_FEMOSTON');
+  const [newFailedCategory, setNewFailedCategory] =
+    useState<NonNullable<PriorFailedTreatment['stopReasonCategory']>>('INTOLERANCE_OR_ALLERGY');
   const [newFailedReason, setNewFailedReason] = useState('');
 
   // חישובים קליניים חיים
@@ -160,7 +162,8 @@ export const Stage1View: React.FC<Stage1ViewProps> = ({
       id: `failed_${Date.now()}`,
       treatmentKey: newFailedKey,
       customName: PRIOR_TREATMENT_LABELS[newFailedKey],
-      reasonStopped: newFailedReason.trim()
+      reasonStopped: newFailedReason.trim(),
+      stopReasonCategory: newFailedCategory
     };
     onChange({
       preferences: {
@@ -2225,12 +2228,14 @@ export const Stage1View: React.FC<Stage1ViewProps> = ({
 
             {/* טיפולי עבר שנכשלו / הופסקו */}
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-xs space-y-2.5">
-              <div className="font-bold text-slate-800">טיפולי עבר לגיל המעבר שנוסו והופסקו / נכשלו:</div>
-              <div className="flex flex-col sm:flex-row gap-2">
+              <div className="font-bold text-slate-800">
+                טיפולי עבר לגיל המעבר שנוסו בעבר (הפרדה בין אי-סבילות פוסלת לתגובה חלקית במינון קבוע):
+              </div>
+              <div className="flex flex-col sm:flex-row flex-wrap gap-2">
                 <select
                   value={newFailedKey}
                   onChange={(e) => setNewFailedKey(e.target.value as PriorFailedTreatment['treatmentKey'])}
-                  className="p-2 border border-slate-300 rounded-lg bg-white sm:w-64"
+                  className="p-2 border border-slate-300 rounded-lg bg-white sm:w-56"
                 >
                   {Object.entries(PRIOR_TREATMENT_LABELS).map(([k, label]) => (
                     <option key={k} value={k}>
@@ -2238,12 +2243,28 @@ export const Stage1View: React.FC<Stage1ViewProps> = ({
                     </option>
                   ))}
                 </select>
+                <select
+                  value={newFailedCategory}
+                  onChange={(e) =>
+                    setNewFailedCategory(
+                      e.target.value as NonNullable<PriorFailedTreatment['stopReasonCategory']>
+                    )
+                  }
+                  className="p-2 border border-slate-300 rounded-lg bg-white sm:w-64"
+                >
+                  <option value="INTOLERANCE_OR_ALLERGY">
+                    תופעות לוואי / אי-סבילות / אלרגיה (פסילת התכשיר)
+                  </option>
+                  <option value="SUBOPTIMAL_EFFICACY">
+                    הקלה חלקית בלבד במינון קבוע (ללא פסילה – צורך בטיטרציה/שדרוג)
+                  </option>
+                </select>
                 <input
                   type="text"
-                  placeholder="סיבת הפסקה / כישלון (למשל: גרד מהמדבקה, דימומים, חוסר השפעה)..."
+                  placeholder="פירוט (למשל: פריחה מהמדבקה, או גלי חום נמשכים תחת אקטיבל)..."
                   value={newFailedReason}
                   onChange={(e) => setNewFailedReason(e.target.value)}
-                  className="flex-1 p-2 border border-slate-300 rounded-lg bg-white"
+                  className="flex-1 min-w-[200px] p-2 border border-slate-300 rounded-lg bg-white"
                 />
                 <button
                   type="button"
@@ -2257,24 +2278,40 @@ export const Stage1View: React.FC<Stage1ViewProps> = ({
 
               {data.preferences.priorFailedTreatments.length > 0 && (
                 <div className="space-y-1.5 pt-1">
-                  {data.preferences.priorFailedTreatments.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-rose-200"
-                    >
-                      <div>
-                        <span className="font-bold text-rose-900">{item.customName}: </span>
-                        <span className="text-slate-700">{item.reasonStopped}</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => removePriorFailedTreatment(item.id)}
-                        className="text-slate-400 hover:text-rose-600"
+                  {data.preferences.priorFailedTreatments.map((item) => {
+                    const isSuboptimal = item.stopReasonCategory === 'SUBOPTIMAL_EFFICACY';
+                    return (
+                      <div
+                        key={item.id}
+                        className={`flex items-center justify-between bg-white px-3 py-2 rounded-lg border ${
+                          isSuboptimal ? 'border-amber-300' : 'border-rose-200'
+                        }`}
                       >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className={`font-bold ${isSuboptimal ? 'text-amber-900' : 'text-rose-900'}`}>
+                            {item.customName}:
+                          </span>
+                          <span
+                            className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                              isSuboptimal
+                                ? 'bg-amber-100 text-amber-900'
+                                : 'bg-rose-100 text-rose-900'
+                            }`}
+                          >
+                            {isSuboptimal ? 'הקלה חלקית (דורג לשדרוג)' : 'אי-סבילות (תכשיר נפסל)'}
+                          </span>
+                          <span className="text-slate-700">{item.reasonStopped}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removePriorFailedTreatment(item.id)}
+                          className="text-slate-400 hover:text-rose-600"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -2288,43 +2325,53 @@ export const Stage1View: React.FC<Stage1ViewProps> = ({
           </section>
 
           {/* ================================================================= */}
-          {/* סעיף 9: בדיקות סקר (לפי גיל וסל הבריאות) ומעבדה */}
+          {/* סעיף 9: בדיקות סקר ומעקב מותאמות אישית (לפי פרופיל האישה וסל הבריאות) */}
           {/* ================================================================= */}
           <section id="sec-screening" className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
             <div className="flex items-center gap-2 border-b border-slate-100 pb-3 mb-4">
               <Sparkles className="w-5 h-5 text-teal-600" />
               <h2 className="text-base font-bold text-slate-800">
-                9. בדיקות סקר (לפי גיל וסל הבריאות בישראל) ובדיקות מעבדה
+                9. בדיקות סקר ומעקב מותאמות אישית לפרופיל המטופלת ובדיקות מעבדה
               </h2>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  ממוגרפיה (בסל: דו-שנתית 50–74 / 40+ בסיכון)
+                  {data.medicalHistory.breastCancerHistory || data.medicalHistory.dcisOrAtypicalHyperplasia
+                    ? 'מעקב הדמיית שד אונקולוגי/כירורגי (ממוגרפיה שנתית ± US/MRI)'
+                    : data.familyHistory.brcaStatus === 'BRCA1' || data.familyHistory.brcaStatus === 'BRCA2'
+                    ? `מעקב מרפאת נשאיות ${data.familyHistory.brcaStatus} (MRI + ממוגרפיה שנתית)`
+                    : data.familyHistory.familyCancerFirstDegreeUnder50OrMultiple
+                    ? 'ממוגרפיה שנתית בסיכון משפחתי (מגיל 40)'
+                    : 'ממוגרפיה (בסל בסיכון רגיל: דו-שנתית 50–74)'}
                 </label>
                 <select
                   value={data.mammographyStatus}
                   onChange={(e) => onChange({ mammographyStatus: e.target.value as ScreeningStatus })}
                   className="w-full p-2 border border-slate-300 rounded-lg bg-white"
                 >
-                  <option value="UP_TO_DATE_NORMAL">בתוקף ותקינה (BI-RADS 1/2)</option>
-                  <option value="NOT_REQUIRED_BY_AGE">טרם בגיל הסקר (&lt;50 בסיכון רגיל)</option>
-                  <option value="OVERDUE">פג תוקף / מעל שנתיים</option>
+                  <option value="UP_TO_DATE_NORMAL">בתוקף ותקינה (לפי הפרוטוקול המותאם לה)</option>
+                  <option value="NOT_REQUIRED_BY_AGE">טרם בגיל הסקר (&lt;50 בסיכון ממוצע)</option>
+                  <option value="OVERDUE">פג תוקף לפי הפרוטוקול האישי שלה</option>
                   <option value="NOT_PERFORMED">לא בוצעה</option>
                   <option value="ABNORMAL_SUSPECTED">ממצא חשוד בבירור (חוסם!)</option>
                 </select>
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">משטח צוואר הרחם / hrHPV (25–65)</label>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  {data.hadHysterectomy && !data.cervixConserved
+                    ? 'צוואר הרחם (לאחר כריתת רחם שלמה)'
+                    : 'משטח צוואר הרחם / hrHPV (גילאי 25–65)'}
+                </label>
                 <select
                   value={data.papHpvStatus}
                   onChange={(e) => onChange({ papHpvStatus: e.target.value as ScreeningStatus })}
                   className="w-full p-2 border border-slate-300 rounded-lg bg-white"
                 >
                   <option value="UP_TO_DATE_NORMAL">בתוקף ותקין</option>
-                  <option value="NOT_REQUIRED_BY_AGE">לא נדרש (גיל &gt;65 תקין / כריתת רחם מלאה)</option>
+                  <option value="NOT_REQUIRED_BY_AGE">לא נדרש (גיל &gt;65 תקין / כריתת רחם שלמה שפירה)</option>
                   <option value="OVERDUE">פג תוקף</option>
                   <option value="NOT_PERFORMED">לא בוצע</option>
                   <option value="ABNORMAL_SUSPECTED">ממצא חריג בבירור (חוסם!)</option>
@@ -2332,14 +2379,20 @@ export const Stage1View: React.FC<Stage1ViewProps> = ({
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">דם סמוי בצואה FIT / קולונוסקופיה (50–74)</label>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  {data.medicalHistory.cervicalOrColorectalCancer ||
+                  data.familyHistory.lynchSyndrome ||
+                  data.familyHistory.familyEndometrialOrColorectalCancer
+                    ? 'מעקב קולונוסקופיה תקופתי (סיכון אישי/משפחתי/לינץ׳)'
+                    : 'דם סמוי בצואה FIT שנתית (50–74 בסיכון ממוצע)'}
+                </label>
                 <select
                   value={data.fitColorectalStatus}
                   onChange={(e) => onChange({ fitColorectalStatus: e.target.value as ScreeningStatus })}
                   className="w-full p-2 border border-slate-300 rounded-lg bg-white"
                 >
                   <option value="UP_TO_DATE_NORMAL">בתוקף ותקין</option>
-                  <option value="NOT_REQUIRED_BY_AGE">מתחת לגיל 50 בסיכון רגיל</option>
+                  <option value="NOT_REQUIRED_BY_AGE">מתחת לגיל 50 בסיכון ממוצע</option>
                   <option value="OVERDUE">פג תוקף</option>
                   <option value="NOT_PERFORMED">לא בוצע</option>
                 </select>

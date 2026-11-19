@@ -107,12 +107,25 @@ export function generateEmrSummary(record: PatientRecord): string {
           lines.push(`טיפולים מקומיים משולבים ל-GSM: ${gsms.join(' + ')}`);
         }
       }
+      if (record.selectedPlan.selectedComplementaryIds && record.selectedPlan.selectedComplementaryIds.length > 0) {
+        const comps = recs.holisticCare.complementaryTherapies
+          .filter((c) => record.selectedPlan?.selectedComplementaryIds?.includes(c.id))
+          .map((c) => c.titleHebrew);
+        if (comps.length > 0) {
+          lines.push(`טיפולים משלימים מוכחים שנבחרו: ${comps.join(' + ')}`);
+        }
+      }
       if (record.selectedPlan.includeTestosterone && recs.testosteroneOption) {
         lines.push(`טיפול נלווה ל-HSDD: ${recs.testosteroneOption.titleHebrew}`);
       }
       if (record.selectedPlan.stage2PatientInstructionsFreeText?.trim()) {
         lines.push(`דגשי נטילה אישיים למטופלת: ${record.selectedPlan.stage2PatientInstructionsFreeText.trim()}`);
       }
+    }
+    if (recs.holisticCare.lifestyleItems.length > 0) {
+      lines.push(
+        `אורח חיים מותאם אישית: ${recs.holisticCare.lifestyleItems.map((l) => l.domainHebrew).join(' | ')}`
+      );
     }
 
     if (record.stage2Notes.length > 0) {

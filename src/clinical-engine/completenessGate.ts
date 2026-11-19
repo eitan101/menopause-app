@@ -96,35 +96,134 @@ export function evaluateCompletenessGate(data: Stage1Data): CompletenessGateResu
 
   const systemicMhtContraindicated = contraindicationNotices.length > 0;
 
-  // 3. בדיקות סקר מותאמות גיל לפי סל הבריאות בישראל (IMA / משרד הבריאות)
-  const highBreastFamilyRisk =
-    familyHistory.brcaStatus === 'BRCA1' ||
-    familyHistory.brcaStatus === 'BRCA2' ||
-    familyHistory.familyCancerFirstDegreeUnder50OrMultiple ||
-    medicalHistory.dcisOrAtypicalHyperplasia;
+  // 3. בדיקות סקר ומעקב מותאמות אישית לפרופיל האישה (IMA 2022 / סל הבריאות / NICE / NCCN)
 
-  const mammographyRequiredByBasket =
-    (age >= 50 && age <= 74) || (age >= 40 && highBreastFamilyRisk);
+  // 3א. הדמיית שד ומעקב שד – מותאם אישית (מחלימת סרטן שד / DCIS ≠ נשאית BRCA ≠ סיכון משפחתי ≠ סיכון ממוצע!)
+  const isBrcaCarrier = familyHistory.brcaStatus === 'BRCA1' || familyHistory.brcaStatus === 'BRCA2';
+  const hasPersonalBreastNeoplasm =
+    medicalHistory.breastCancerHistory || medicalHistory.dcisOrAtypicalHyperplasia;
+  const hasHighFamilyBreastRisk = familyHistory.familyCancerFirstDegreeUnder50OrMultiple;
 
-  if (mammographyRequiredByBasket) {
+  if (hasPersonalBreastNeoplasm) {
+    // אישה עם היסטוריה אישית של סרטן שד / DCIS / אטיפיה – לעולם לא ממוגרפיית סקר דו-שנתית רגילה!
     if (data.mammographyStatus === 'OVERDUE' || data.mammographyStatus === 'NOT_PERFORMED') {
       warnings.push(
-        highBreastFamilyRisk && age < 50
-          ? `סיכון משפחתי/שד מוגבר בגיל ${age}: מומלץ להשלים ממוגרפיה שנתית/מעקב מרפאת שד בסל הבריאות במקביל לתכנון הטיפול.`
-          : `גיל ${age} (טווח סל הבריאות 50–74): ממוגרפיה דו-שנתית אינה בתוקף – מומלץ להפנות להשלמת ממוגרפיה (ב-Red Whale ניתן להתחיל טיפול במקביל להפניה באישה א-תסמינית ללא ממצא בשד).`
+        'היסטוריה אישית של סרטן שד / DCIS / אטיפיה בשד: נדרש מעקב שד אונקולוגי/כירורגי שנתי מותאם אישית (ממוגרפיה שנתית ± US/MRI שד לפי פרוטוקול המרפאה האונקולוגית – ולא תוכנית הסקר הדו-שנתית הרגילה!).'
       );
-      basketRecommendations.push('הפניה לממוגרפיה דו-שנתית בסל הבריאות (גילאי 50–74, או מגיל 40 בסיכון משפחתי מוגבר).');
-      patientInstructions.push('ביצוע בדיקת ממוגרפיה שגרתית במכון השד של הקופה.');
+      basketRecommendations.push(
+        'מעקב שד אונקולוגי מותאם אישית: ממוגרפיה שנתית ± US/MRI שד ובדיקת כירורג/ית שד או אונקולוג/ית (לא סקר דו-שנתי שגרתי).'
+      );
+      patientInstructions.push(
+        'הקפדה על מעקב הדמיית שד שנתי מותאם אישית (ממוגרפיה שנתית ± אולטרסאונד/MRI שד) במרפאת השד / האונקולוגיה המטפלת.'
+      );
+    } else if (data.mammographyStatus === 'UP_TO_DATE_NORMAL') {
+      basketRecommendations.push(
+        'המשך מעקב שד אונקולוגי/מרפאת שד שנתי קבוע (אחת לשנה לפי הנחיית האונקולוג/ית וכירורג/ית השד).'
+      );
     }
-  } else if (age < 50 && !highBreastFamilyRisk && data.mammographyStatus === 'NOT_PERFORMED') {
+  } else if (isBrcaCarrier) {
+    // נשאית BRCA1/2 ידועה – פרוטוקול מרפאת נשאיות בסיכון גבוה (MRI שנתי + ממוגרפיה שנתית לסירוגין כל 6 חודשים) + דיון RRBSO
+    if (data.mammographyStatus === 'OVERDUE' || data.mammographyStatus === 'NOT_PERFORMED') {
+      warnings.push(
+        `נשאית ${familyHistory.brcaStatus}: נדרש מעקב מרפאת נשאיות בסיכון גבוה בסל הבריאות (MRI שד שנתי מגיל 25 וממוגרפיה שנתית מגיל 30 לסירוגין כל 6 חודשים + כירורג/ית שד – ולא ממוגרפיה דו-שנתית רגילה!).`
+      );
+      basketRecommendations.push(
+        `פרוטוקול נשאיות ${familyHistory.brcaStatus} בסל הבריאות: MRI שד שנתי + ממוגרפיה שנתית (לסירוגין כל חצי שנה) במרפאת נשאיות.`
+      );
+      patientInstructions.push(
+        `תיאום מעקב מרפאת נשאיות (${familyHistory.brcaStatus}): MRI שד שנתי וממוגרפיה שנתית לסירוגין כל 6 חודשים.`
+      );
+    } else {
+      basketRecommendations.push(
+        `נשאית ${familyHistory.brcaStatus}: המשך מעקב חצי-שנתי לסירוגין (MRI שד שנתי + ממוגרפיה שנתית) במרפאת נשאיות.`
+      );
+    }
+
+    // אם השחלות עדיין שמורות בנשאית BRCA בגיל המומלץ ל-RRBSO (35–40 ב-BRCA1, 40–45 ב-BRCA2)
+    const rrbsoTargetAge = familyHistory.brcaStatus === 'BRCA1' ? 35 : 40;
+    if (!data.hadBsoOrRrso && age >= rrbsoTargetAge) {
+      warnings.push(
+        `נשאית ${familyHistory.brcaStatus} בגיל ${age} עם שחלות שמורות: מומלץ לוודא ייעוץ גינקו-אונקולוגי לגבי כריתת טפולות מפחיתת סיכון (RRBSO – מומלץ בגילאי ${
+          familyHistory.brcaStatus === 'BRCA1' ? '35–40' : '40–45'
+        }).`
+      );
+      basketRecommendations.push(
+        `ייעוץ גינקו-אונקולוגי בנושא כריתת טפולות מפחיתת סיכון (RRBSO) לנשאית ${familyHistory.brcaStatus}.`
+      );
+    }
+  } else if (hasHighFamilyBreastRisk) {
+    // סיפור משפחתי מוגבר (קרובה מדרגה ראשונה <50 או ריבוי מקרים) – ממוגרפיה שנתית מגיל 40!
+    if (age >= 40 && (data.mammographyStatus === 'OVERDUE' || data.mammographyStatus === 'NOT_PERFORMED')) {
+      warnings.push(
+        `סיכון משפחתי מוגבר לסרטן שד בגיל ${age}: מומלץ להשלים ממוגרפיה שנתית (אחת לשנה מגיל 40 בסל הבריאות, ולא דו-שנתית) ובדיקת מרפאת שד.`
+      );
+      basketRecommendations.push(
+        'הפניה לממוגרפיה שנתית בסל הבריאות (אחת לשנה מגיל 40 בשל סיפור משפחתי מוגבר מדרגה ראשונה).'
+      );
+      patientInstructions.push(
+        'ביצוע בדיקת ממוגרפיה שנתית (אחת לשנה בשל הסיפור המשפחתי) ומעקב מרפאת שד.'
+      );
+    }
+  } else {
+    // אישה בסיכון ממוצע (ללא סרטן שד אישי, ללא נשאות BRCA וללא סיפור משפחתי מוקדם/מרובה)
+    if (age >= 50 && age <= 74) {
+      if (data.mammographyStatus === 'OVERDUE' || data.mammographyStatus === 'NOT_PERFORMED') {
+        warnings.push(
+          `גיל ${age} בסיכון ממוצע (טווח סל הבריאות 50–74): ממוגרפיה דו-שנתית אינה בתוקף – מומלץ להפנות להשלמת ממוגרפיה (ב-Red Whale ניתן להתחיל טיפול במקביל להפניה באישה א-תסמינית ללא ממצא בשד).`
+        );
+        basketRecommendations.push('הפניה לממוגרפיה דו-שנתית בתוכנית הלאומית בסל הבריאות (גילאי 50–74 בסיכון רגיל).');
+        patientInstructions.push('ביצוע בדיקת ממוגרפיה דו-שנתית שגרתית במכון השד של הקופה.');
+      }
+    } else if (age < 50 && data.mammographyStatus === 'NOT_PERFORMED') {
+      basketRecommendations.push(
+        `גיל ${age} בסיכון ממוצע: לפי הנחיות משרד הבריאות והר"י (IMA 2022) אין צורך בממוגרפיית סקר שגרתית לפני גיל 50 כתנאי ל-MHT.`
+      );
+    } else if (age > 74 && (data.mammographyStatus === 'OVERDUE' || data.mammographyStatus === 'NOT_PERFORMED')) {
+      basketRecommendations.push(
+        `גיל ${age} (>74): המשך ממוגרפיה ייקבע בהחלטה משותפת פרטנית לפי מצב בריאותי כללי ותוחלת חיים (IMA 2022).`
+      );
+    }
+  }
+
+  // 3ב. בירור גנטי מותאם אישית: פאנל אונקוגנטי מלא בסיפור אישי/משפחתי מוגבר לעומת סקר מוטציות המייסד באשכנזיות בריאות!
+  const needsFullOncogeneticPanel =
+    medicalHistory.breastCancerHistory ||
+    medicalHistory.ovarianCancerHistory !== 'NONE' ||
+    familyHistory.familyCancerFirstDegreeUnder50OrMultiple;
+
+  if (
+    needsFullOncogeneticPanel &&
+    (familyHistory.brcaStatus === 'NOT_TESTED' || familyHistory.brcaStatus === 'UNKNOWN')
+  ) {
     basketRecommendations.push(
-      `גיל ${age} בסיכון רגיל: לפי הנחיות סל הבריאות בישראל אין צורך בממוגרפיה שגרתית לפני גיל 50 כתנאי ל-MHT.`
+      'הפניה לייעוץ גנטי אונקולוגי מלא (בדיקת פאנל גנים רחב בסל הבריאות בשל היסטוריה אישית/משפחתית של סרטן שד/שחלה – ולא בדיקת סקר אוכלוסייה מצומצמת בלבד).'
+    );
+    patientInstructions.push(
+      'תיאום תור למכון גנטי בקופת החולים/בית החולים להשלמת ייעוץ גנטי ובדיקת פאנל גנים מותאמת אישית.'
+    );
+  } else if (
+    age >= 25 &&
+    !needsFullOncogeneticPanel &&
+    (data.ethnicity === 'ASHKENAZI' || data.ethnicity === 'MIXED_ASHKENAZI') &&
+    (familyHistory.brcaStatus === 'NOT_TESTED' || familyHistory.brcaStatus === 'UNKNOWN')
+  ) {
+    basketRecommendations.push(
+      'זכאות סל הבריאות (מ-2020): בדיקת דם חינם למוטציות המייסד ב-BRCA1/BRCA2 ללא צורך בייעוץ גנטי מקדים לנשים מגיל 25 ממוצא אשכנזי מלא או חלקי.'
+    );
+    patientInstructions.push(
+      'יידוע על זכאות לבדיקת סקר גנטית חינם ל-BRCA1/2 בקופת החולים (למוצא אשכנזי מלא/חלקי).'
     );
   }
 
-  // משטח צוואר הרחם / hrHPV (גילאי 25–65 אם קיים צוואר רחם)
+  // 3ג. משטח צוואר הרחם / hrHPV – מותאם להימצאות צוואר רחם ולהיסטוריה גינקו-אונקולוגית
   const hasCervix = !data.hadHysterectomy || Boolean(data.cervixConserved);
-  if (hasCervix && age >= 25 && age <= 65) {
+  if (!hasCervix) {
+    if (medicalHistory.cervicalOrColorectalCancer) {
+      basketRecommendations.push(
+        'לאחר כריתת רחם עם רקע של ממאירות צוואר הרחם/מעי: לוודא המשך מעקב משטח כיפת נרתיק (Vault) לפי הנחיית גינקו-אונקולוגיה.'
+      );
+    }
+  } else if (age >= 25 && age <= 65) {
     if (data.papHpvStatus === 'OVERDUE' || data.papHpvStatus === 'NOT_PERFORMED') {
       warnings.push('בדיקת סקר צוואר הרחם (משטח hrHPV בגילאי 25–65) אינה מעודכנת – מומלץ להשלים.');
       basketRecommendations.push('הפניה לבדיקת סקר צוואר הרחם (hrHPV אחת ל-3–5 שנים בסל הבריאות עד גיל 65).');
@@ -132,36 +231,44 @@ export function evaluateCompletenessGate(data: Stage1Data): CompletenessGateResu
     }
   }
 
-  // בדיקת סקר גנטי לנשאות BRCA1/2 במוצא אשכנזי (מלא או חלקי) מגיל 25 בסל הבריאות בישראל!
+  // 3ד. סקר סרטן המעי הגס – קולונוסקופיה בסיכון אישי/משפחתי/לינץ׳/IBD לעומת FIT שנתי בסיכון ממוצע (50–74)
   if (
-    age >= 25 &&
-    (data.ethnicity === 'ASHKENAZI' || data.ethnicity === 'MIXED_ASHKENAZI') &&
-    (familyHistory.brcaStatus === 'NOT_TESTED' || familyHistory.brcaStatus === 'UNKNOWN')
+    medicalHistory.cervicalOrColorectalCancer ||
+    familyHistory.lynchSyndrome ||
+    familyHistory.familyEndometrialOrColorectalCancer
   ) {
-    basketRecommendations.push(
-      'זכאות סל הבריאות (מ-2020): בדיקת דם למוטציות המייסד ב-BRCA1/BRCA2 ללא צורך בייעוץ גנטי מקדים לנשים מגיל 25 ממוצא אשכנזי מלא או חלקי.'
-    );
-    patientInstructions.push(
-      'יידוע על זכאות לבדיקת סקר גנטית חינם ל-BRCA1/2 בקופת החולים (למוצא אשכנזי מלא/חלקי).'
-    );
-  }
-
-  // סקר סרטן המעי הגס (דם סמוי בצואה FIT בגילאי 50–74 או קולונוסקופיה בסיכון משפחתי/לינץ')
-  if (familyHistory.lynchSyndrome || familyHistory.familyEndometrialOrColorectalCancer) {
-    basketRecommendations.push('רקע משפחתי של ממאירות מעי גס/רירית הרחם או תסמונת לינץ׳: לוודא מעקב קולונוסקופיה תקופתי.');
-    patientInstructions.push('תיאום מעקב קולונוסקופיה תקופתי בשל הרקע המשפחתי.');
-  } else if (age >= 50 && age <= 74 && (data.fitColorectalStatus === 'OVERDUE' || data.fitColorectalStatus === 'NOT_PERFORMED')) {
-    basketRecommendations.push('הפניה לבדיקת דם סמוי בצואה (FIT) שנתית בסל הבריאות (גילאי 50–74).');
+    if (data.fitColorectalStatus !== 'UP_TO_DATE_NORMAL') {
+      basketRecommendations.push(
+        'רקע אישי/משפחתי של ממאירות מעי גס/רירית הרחם או תסמונת לינץ׳: מעקב קולונוסקופיה תקופתי מותאם אישית (ולא בדיקת דם סמוי בצואה רגילה!).'
+      );
+      patientInstructions.push(
+        'תיאום מעקב קולונוסקופיה תקופתי מותאם אישית במכון גסטרואנטרולוגיה (בהתאם לרקע המשפחתי/אישי).'
+      );
+    }
+  } else if (
+    age >= 50 &&
+    age <= 74 &&
+    (data.fitColorectalStatus === 'OVERDUE' || data.fitColorectalStatus === 'NOT_PERFORMED')
+  ) {
+    basketRecommendations.push('הפניה לבדיקת דם סמוי בצואה (FIT) שנתית בסל הבריאות (גילאי 50–74 בסיכון ממוצע).');
     patientInstructions.push('ביצוע בדיקת דם סמוי בצואה (FIT) שנתית במעבדת הקופה.');
   }
 
-  // צפיפות עצם (DXA) ו-FRAX
+  // 3ה. צפיפות עצם (DXA) ו-FRAX – מותאם לסטטוס ה-DXA הקיים ולמעכבי ארומטאז
   const boneRisk = calculateBoneRisk(data);
   if (boneRisk.dxaIndicated) {
     basketRecommendations.push(
       `התוויה לבדיקת צפיפות עצם (DXA) וחישוב FRAX ישראל בשל: ${boneRisk.triggers.join(', ')}.`
     );
-    patientInstructions.push('ביצוע בדיקת צפיפות עצם (DXA) ובדיקת רמת ויטמין D בדם.');
+    patientInstructions.push(
+      medications.takingAromataseInhibitors
+        ? 'ביצוע בדיקת צפיפות עצם (DXA) בסיסית ובדיקת רמת ויטמין D וסידן בשל הטיפול במעכב ארומטאז.'
+        : 'ביצוע בדיקת צפיפות עצם (DXA) ובדיקת רמת ויטמין D בדם.'
+    );
+  } else if (data.dxaStatus === 'OSTEOPOROSIS' || data.dxaStatus === 'OSTEOPENIA') {
+    basketRecommendations.push(
+      `מתועדת ${data.dxaStatus === 'OSTEOPOROSIS' ? 'אוסטיאופורוזיס' : 'אוסטיאופניה'} בבדיקת DXA: לוודא ויטמין D (800–1000 יחב"ל/יום), סידן (1000–1200 מ"ג/יום), אימוני התנגדות והערכת צורך בטיפול תרופתי ייעודי לעצם ומעקב DXA תקופתי.`
+    );
   }
 
   // ספירת דם ופריטין בדימום ווסתי מוגבר בפרי-מנופאוזה + פרופיל מטבולי וכבד

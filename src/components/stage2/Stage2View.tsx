@@ -83,14 +83,20 @@ export const Stage2View: React.FC<Stage2ViewProps> = ({
       ? selectedPlan.selectedPrimaryOptionId
       : recs.rankedOptions[0]?.id || '';
 
+  const defaultComplementaryIds = recs.holisticCare.complementaryTherapies
+    .filter((c) => c.recommended)
+    .map((c) => c.id);
+
   const currentPlan: SelectedTreatmentPlan = selectedPlan
     ? {
         ...selectedPlan,
-        selectedPrimaryOptionId: activeOptionId
+        selectedPrimaryOptionId: activeOptionId,
+        selectedComplementaryIds: selectedPlan.selectedComplementaryIds ?? defaultComplementaryIds
       }
     : {
         selectedPrimaryOptionId: activeOptionId,
         selectedGsmOptionIds: defaultGsmIds,
+        selectedComplementaryIds: defaultComplementaryIds,
         includeTestosterone: false,
         selectionRationaleTags: [],
         selectionRationaleFreeText: '',
@@ -136,6 +142,19 @@ export const Stage2View: React.FC<Stage2ViewProps> = ({
     onSelectPlan({
       ...currentPlan,
       selectedGsmOptionIds: nextIds,
+      selectedAtIso: new Date().toISOString()
+    });
+  };
+
+  const toggleComplementaryOption = (compId: string) => {
+    const currentCompIds = currentPlan.selectedComplementaryIds || [];
+    const exists = currentCompIds.includes(compId);
+    const nextIds = exists
+      ? currentCompIds.filter((id) => id !== compId)
+      : [...currentCompIds, compId];
+    onSelectPlan({
+      ...currentPlan,
+      selectedComplementaryIds: nextIds,
       selectedAtIso: new Date().toISOString()
     });
   };
@@ -502,86 +521,170 @@ export const Stage2View: React.FC<Stage2ViewProps> = ({
         </div>
       </section>
 
-      {/* 3ב. סקשן מופרד לחלוטין: טיפול בטסטוסטרון עורי נשי עבור HSDD */}
-      {recs.testosteroneOption && (
-        <section className="bg-white rounded-2xl border border-rose-200 shadow-sm p-5 space-y-3 text-xs">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-rose-100 pb-3">
+      {/* 3ב. גישה דו-שלבית לתלונת ירידה בחשק המיני (HSDD): איזון אסטרוגן עורי + GSM בשלב 2, וטסטוסטרון רק בשלב 3 אם התסמינים נמשכים! */}
+      {recs.hsddStepwiseNoteHebrew && (
+        <section className="bg-rose-50/70 rounded-2xl border border-rose-200 shadow-sm p-5 space-y-2 text-xs">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-2">
-              <Flame className="w-5 h-5 text-rose-600" />
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">
-                  טיפול ייעודי בחשק מיני ירוד הגורם מצוקה (HSDD) – מופרד מהטיפול המקומי ב-GSM
-                </h3>
-                <p className="text-[11px] text-slate-500">
-                  טסטוסטרון סיסטמי עורי במינון נשי פיזיולוגי (בהתאם לקונצנזוס הבינלאומי ו-BMS)
-                </p>
-              </div>
+              <Flame className="w-5 h-5 text-rose-600 shrink-0" />
+              <h3 className="text-sm font-extrabold text-rose-950">
+                ניהול מדורג של ירידה בחשק המיני (HSDD) – מדוע טסטוסטרון מוצע רק במעקב (שלב 3)?
+              </h3>
             </div>
-            {recs.testosteroneOption.recommended && (
-              <span className="text-[11px] bg-rose-100 text-rose-900 border border-rose-200 px-2.5 py-1 rounded-full font-bold self-start">
-                רלוונטי לתלונת ירידה בתשוקה שדווחה בשאלון IMS
+            <span className="text-[11px] bg-white text-rose-900 border border-rose-200 px-2.5 py-0.5 rounded-full font-bold">
+              NICE 2024 · BMS · IMS · ACOG 2026
+            </span>
+          </div>
+          <p className="text-slate-800 leading-relaxed">{recs.hsddStepwiseNoteHebrew}</p>
+        </section>
+      )}
+
+      {/* 3ג. המלצות אורח חיים מותאמות אישית, טיפולים משלימים שהוכחו כיעילים וצמחי מרפא (מבוסס מקורות תיקיית הידע בלבד) */}
+      <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-5 text-xs">
+        <div className="border-b border-slate-100 pb-3">
+          <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-emerald-600" />
+            <span>
+              אורח חיים מותאם אישית, טיפולים משלימים מוכחים (CBT, היפנוזה קלינית, מיינדפולנס, דיקור) וצמחי מרפא
+            </span>
+          </h3>
+          <p className="text-[11px] text-slate-500 mt-0.5">
+            מבוסס אך ורק על הקווים המנחים בתיקיית הידע (ACOG CPG 13 2026, BMS July 2026, NICE NG23 2024, הר"י / משרד הבריאות 2022 ו-Red Whale) ומותאם לתיק הרפואי של המטופלת
+          </p>
+        </div>
+
+        {/* תת-חלק א: אורח חיים מותאם אישית */}
+        <div className="space-y-2.5">
+          <div className="font-bold text-slate-800 text-sm">
+            1. המלצות אורח חיים מותאמות אישית למטופלת (נכללות אוטומטית בדף ההנחיות למטופלת):
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {recs.holisticCare.lifestyleItems.map((life) => (
+              <div
+                key={life.id}
+                className={`p-3.5 rounded-xl border space-y-1.5 ${
+                  life.priority === 'HIGH'
+                    ? 'bg-emerald-50/50 border-emerald-300'
+                    : 'bg-slate-50/70 border-slate-200'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-bold text-slate-900">{life.domainHebrew}</span>
+                  {life.priority === 'HIGH' && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900">
+                      דגש אישי גבוה
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-700 leading-relaxed">{life.recommendationHebrew}</p>
+                <p className="text-[10px] text-slate-500 font-medium">מקור: {life.sourceCitation}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* תת-חלק ב: טיפולים משלימים שהוכחו כיעילים (ניתן לשילוב בתוכנית הטיפול) */}
+        <div className="space-y-2.5 pt-2 border-t border-slate-100">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="font-bold text-slate-800 text-sm">
+              2. טיפולים משלימים (גוף-נפש) שהוכחו כיעילים במחקרים מבוקרים (ניתן לשלב במקביל לטיפול התרופתי או בפני עצמם):
+            </div>
+            {(currentPlan.selectedComplementaryIds?.length || 0) > 0 && (
+              <span className="text-[11px] font-bold bg-indigo-50 text-indigo-900 border border-indigo-200 px-3 py-0.5 rounded-full">
+                נבחרו {currentPlan.selectedComplementaryIds?.length} טיפולים משלימים
               </span>
             )}
           </div>
 
-          <div
-            className={`p-4 rounded-2xl border transition ${
-              currentPlan.includeTestosterone
-                ? 'bg-rose-50/60 border-rose-500 ring-1 ring-rose-400'
-                : 'bg-slate-50/70 border-slate-200'
-            }`}
-          >
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <div className="font-extrabold text-slate-900 text-sm">
-                  {recs.testosteroneOption.titleHebrew}
-                </div>
-                <p className="text-rose-900 font-semibold">{recs.testosteroneOption.brandAndDoseHebrew}</p>
-                <p className="text-slate-700">{recs.testosteroneOption.scheduleHebrew}</p>
-                <div className="pt-1">
-                  <strong className="text-slate-800">תנאי קדם קליניים:</strong>
-                  {recs.testosteroneOption.prerequisitesHebrew.map((pre, i) => (
-                    <p key={i} className="text-[11px] text-slate-700">
-                      • {pre}
-                    </p>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-2 flex flex-col justify-between">
-                <div className="bg-white p-3 rounded-xl border border-rose-100 space-y-1">
-                  <strong className="text-slate-800">פרוטוקול ניטור מעבדה מחייב:</strong>
-                  {recs.testosteroneOption.monitoringProtocolHebrew.map((m, i) => (
-                    <p key={i} className="text-[11px] text-slate-700">
-                      • {m}
-                    </p>
-                  ))}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    onSelectPlan({
-                      ...currentPlan,
-                      includeTestosterone: !currentPlan.includeTestosterone,
-                      selectedAtIso: new Date().toISOString()
-                    })
-                  }
-                  className={`py-2.5 px-4 rounded-xl font-bold text-xs border transition ${
-                    currentPlan.includeTestosterone
-                      ? 'bg-rose-700 text-white border-rose-700'
-                      : 'bg-white text-rose-900 border-rose-300 hover:bg-rose-50'
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {recs.holisticCare.complementaryTherapies.map((comp) => {
+              const isSelectedComp = Boolean(currentPlan.selectedComplementaryIds?.includes(comp.id));
+              return (
+                <div
+                  key={comp.id}
+                  className={`p-4 rounded-xl border flex flex-col justify-between transition ${
+                    isSelectedComp
+                      ? 'bg-indigo-50/60 border-indigo-400 ring-1 ring-indigo-300'
+                      : 'bg-slate-50/60 border-slate-200'
                   }`}
                 >
-                  {currentPlan.includeTestosterone
-                    ? 'טסטוסטרון עורי נשי משולב בתוכנית ✓ (לחצי להסרה)'
-                    : '+ הוסף טסטוסטרון עורי נשי לתוכנית הטיפול'}
-                </button>
-              </div>
-            </div>
+                  <div className="space-y-1.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="font-bold text-slate-900">{comp.titleHebrew}</span>
+                      {comp.recommended && (
+                        <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold shrink-0">
+                          מומלץ לתסמיניה
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] font-semibold text-indigo-900">{comp.evidenceLevelHebrew}</p>
+                    <p className="text-[11px] text-slate-700">
+                      <strong>יעד קליני:</strong> {comp.targetSymptomsHebrew}
+                    </p>
+                    <p className="text-[11px] text-slate-600">{comp.clinicalNotesHebrew}</p>
+                    <p className="text-[10px] text-slate-500">מקור: {comp.sourceCitation}</p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => toggleComplementaryOption(comp.id)}
+                    className={`mt-3 py-2 px-3 rounded-xl font-bold text-xs border transition ${
+                      isSelectedComp
+                        ? 'bg-indigo-700 text-white border-indigo-700'
+                        : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                    }`}
+                  >
+                    {isSelectedComp
+                      ? 'משולב בתוכנית ובדף ההנחיות למטופלת ✓'
+                      : '+ שלב טיפול משלים זה בתוכנית'}
+                  </button>
+                </div>
+              );
+            })}
           </div>
-        </section>
-      )}
+        </div>
+
+        {/* תת-חלק ג: צמחי מרפא ופיטואסטרוגנים – יעילות ובטיחות מותאמת למטופלת */}
+        <div className="space-y-2.5 pt-2 border-t border-slate-100">
+          <div className="font-bold text-slate-800 text-sm">
+            3. צמחי מרפא ופיטואסטרוגנים שנחקרו – מידע מבוסס-ראיות וסינון בטיחות אישי למטופלת:
+          </div>
+          <p className="text-[11px] text-slate-600">{recs.holisticCare.herbalOverviewNoteHebrew}</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {recs.holisticCare.herbalItems.map((herb) => {
+              const isBlocked = herb.safetyStatus === 'CONTRAINDICATED_FOR_PATIENT';
+              return (
+                <div
+                  key={herb.id}
+                  className={`p-3.5 rounded-xl border space-y-1.5 ${
+                    isBlocked
+                      ? 'bg-rose-50/70 border-rose-300'
+                      : 'bg-amber-50/50 border-amber-200'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="font-bold text-slate-900">{herb.titleHebrew}</span>
+                    <span
+                      className={`text-[10px] px-2 py-0.5 rounded-full font-bold shrink-0 ${
+                        isBlocked
+                          ? 'bg-rose-200 text-rose-950'
+                          : 'bg-amber-200 text-amber-950'
+                      }`}
+                    >
+                      {isBlocked ? 'אסור למטופלת זו!' : 'מידע וזהירות'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-700">{herb.evidenceSummaryHebrew}</p>
+                  <p className={`text-[11px] font-semibold ${isBlocked ? 'text-rose-900' : 'text-amber-950'}`}>
+                    {herb.safetyAndInteractionsHebrew}
+                  </p>
+                  <p className="text-[10px] text-slate-500">מקור: {herb.sourceCitation}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
 
       {/* 4. תיעוד האופציה שנבחרה ומדוע + הערות רופא/ה מתוארכות במלל חופשי */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

@@ -1,4 +1,5 @@
 import { BleedingTriageResult, evaluateUnscheduledBleeding } from './bleedingAlgorithm';
+import { buildHolisticCareSuite } from './holisticLifestyleEngine';
 import { compareLongitudinalSymptoms } from './imsSymptoms';
 import { generateCessationProtocol } from './sideEffectEngine';
 import {
@@ -8,9 +9,10 @@ import {
   calculateBoneRisk,
   calculateVteRisk
 } from './riskCalculators';
-import { formulateTreatment } from './treatmentEngine';
+import { buildStage3TestosteroneOption, formulateTreatment } from './treatmentEngine';
 import {
   BmsEndometrialCalculatorOverrides,
+  HolisticCareSuite,
   LocalGsmOption,
   LongitudinalVisit,
   PreventRiskResult,
@@ -55,6 +57,7 @@ export interface FollowUpDecisionSuite {
   rankedFollowUpOptions: TreatmentOptionCard[];
   localGsmOptions: LocalGsmOption[];
   testosteroneOption?: TestosteroneHsddOption;
+  holisticCare: HolisticCareSuite;
   excludedReasonsAudit: string[];
 }
 
@@ -339,6 +342,17 @@ export function evaluateFollowUpDecisionSuite(input: FollowUpEvaluationInput): F
       );
     }
 
+    if (
+      currentOptId === 'opt_oral_mht_regimen' &&
+      suboptimalControl &&
+      candidate.id === 'opt_transdermal_gel_body_identical'
+    ) {
+      adjustedScore = 97;
+      extraReasons.unshift(
+        'מומלץ #1 במעקב עקב תגובה חלקית תחת טבליה פומית במינון קבוע: מעבר לג׳ל אסטרדיול עורי + אוטרוגסטן בערב מאפשר טיטרציית מינון גמישה, שיפור יקיצות שינה ואי-העלאת SHBG!'
+      );
+    }
+
     if (patchRashNow && candidate.id === 'opt_transdermal_gel_body_identical') {
       adjustedScore = 95;
       extraReasons.unshift('מומלץ #1 להחלפה בעקבות גירוי עורי ממדבקות (מדבקות סוננו אוטומטית).');
@@ -395,6 +409,15 @@ export function evaluateFollowUpDecisionSuite(input: FollowUpEvaluationInput): F
 
   followUpCards.sort((a, b) => b.rankScore - a.rankScore);
 
+  // ו. טסטוסטרון עורי נשי ל-HSDD נפתח בשלב 3 (מעקב) רק כאשר ירידת החשק נמשכת למרות הטיפול הראשוני (NICE 2024 / BMS / IMS / Srebnik)!
+  const persistentHsddInFollowUp =
+    (followUpSymptoms['13']?.severity || 0) >= 2 || Boolean(selectedPlan?.includeTestosterone);
+  const stage3TestosteroneOption = buildStage3TestosteroneOption(
+    effectiveStage1,
+    persistentHsddInFollowUp
+  );
+  const holisticCare = buildHolisticCareSuite(effectiveStage1);
+
   return {
     effectiveStage1,
     updatedPrevent,
@@ -405,7 +428,8 @@ export function evaluateFollowUpDecisionSuite(input: FollowUpEvaluationInput): F
     shouldAutoOpenBmsBleedingCalculator,
     rankedFollowUpOptions: followUpCards,
     localGsmOptions: baseRecsForRegimen.localGsmOptions,
-    testosteroneOption: baseRecsForRegimen.testosteroneOption,
+    testosteroneOption: stage3TestosteroneOption,
+    holisticCare,
     excludedReasonsAudit: baseRecsForRegimen.excludedReasonsAudit
   };
 }

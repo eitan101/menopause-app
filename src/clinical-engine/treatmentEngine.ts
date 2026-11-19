@@ -1,5 +1,6 @@
 import { evaluateCompletenessGate } from './completenessGate';
 import { checkDrugInteractions } from './drugInteractions';
+import { buildHolisticCareSuite } from './holisticLifestyleEngine';
 import { summarizeSymptoms } from './imsSymptoms';
 import {
   calculateAhaPreventRisk,
@@ -20,11 +21,62 @@ import {
   TreatmentOptionCard
 } from './types';
 
-function findPriorFailure(
+function findDisqualifyingPriorFailure(
   list: PriorFailedTreatment[],
   keys: PriorFailedTreatment['treatmentKey'][]
 ): PriorFailedTreatment | undefined {
-  return list.find((item) => keys.includes(item.treatmentKey));
+  return list.find(
+    (item) => keys.includes(item.treatmentKey) && item.stopReasonCategory !== 'SUBOPTIMAL_EFFICACY'
+  );
+}
+
+function findSuboptimalPrior(
+  list: PriorFailedTreatment[],
+  keys: PriorFailedTreatment['treatmentKey'][]
+): PriorFailedTreatment | undefined {
+  return list.find(
+    (item) => keys.includes(item.treatmentKey) && item.stopReasonCategory === 'SUBOPTIMAL_EFFICACY'
+  );
+}
+
+export function buildStage3TestosteroneOption(
+  data: Stage1Data,
+  persistentHsddInFollowUp: boolean
+): TestosteroneHsddOption | undefined {
+  const hasBreastCaOrEndocrineTx =
+    data.medicalHistory.breastCancerHistory ||
+    data.medications.takingTamoxifen ||
+    data.medications.takingAromataseInhibitors;
+  const liverBlocked = data.medicalHistory.activeLiverDiseaseOrPorphyria || data.lftStatus === 'ABNORMAL';
+
+  if (hasBreastCaOrEndocrineTx || liverBlocked || !persistentHsddInFollowUp) {
+    return undefined;
+  }
+
+  return {
+    id: 'hsdd_transdermal_testosterone',
+    recommended: true,
+    titleHebrew:
+      'ניסיון טיפולי בטסטוסטרון עורי במינון נשי פיזיולוגי (עבור HSDD עמיד במעקב לאחר מיצוי אסטרוגן + GSM)',
+    brandAndDoseHebrew:
+      'ג׳ל טסטוסטרון 1% (כגון AndroGel במינון נשי Off-label: ~5 מ"ג ליום = טיפה בגודל אפונה; שקית 50 מ"ג מספיקה ל-8–10 ימים)',
+    scheduleHebrew:
+      'ניסיון מוגדר של 3–6 חודשים במריחה יומית על עור נקי ויבש בירך החיצונית או השוק התחתונה',
+    prerequisitesHebrew: [
+      'וידוא שהאסטרוגן הסיסטמי ניתן דרך העור (ג׳ל/מדבקה) – אסטרוגן פומי מעלה SHBG ומפחית טסטוסטרון חופשי!',
+      'וידוא שטופלו יובש/כאב נרתיקי (GSM), הפרעות שינה ותרופות הפוגעות בחשק (כגון SSRI/SNRI) בטרם הוספת טסטוסטרון (NICE 2024 / BMS / IMS).'
+    ],
+    prosHebrew: [
+      'הטיפול התרופתי המבוסס היחיד לשיפור חשק מיני ב-HSDD הנמשך למרות איזון אסטרוגני מיטבי (בפוסט-מנופאוזה ולאחר BSO/RRSO).'
+    ],
+    monitoringProtocolHebrew: [
+      'בדיקת דם ל-Total Testosterone ו-SHBG לפני תחילת הטיפול (בסיס).',
+      'בדיקת דם חוזרת כעבור 3–6 שבועות ובהמשך כל 6–12 חודשים לוודא שהרמה נותרת בטווח הפיזיולוגי הנשי.',
+      'הערכת תגובה קלינית בתום 3–6 חודשים: להפסיק אם אין שיפור בחשק המיני או אם מופיעים אקנה/שיעור יתר (ולשים לב להעדר מידע בטיחות לבבי/אונקולוגי ארוך-טווח מעבר לניסיון מבוקר).'
+    ],
+    patientInstructionsHebrew:
+      'טיפול ב-HSDD במעקב: מרחי טיפה קטנה בגודל אפונה של ג׳ל טסטוסטרון (שקית אחת של 50 מ"ג מספיקה ל-8 עד 10 ימים!) על עור נקי בירך החיצונית/שוק מדי יום, שטפי ידיים מיד במים וסבון, ובצעי בדיקת דם לרמת טסטוסטרון ו-SHBG בעוד 4–6 שבועות.'
+  };
 }
 
 function clampScore(n: number): number {
@@ -198,7 +250,9 @@ export function formulateTreatment(data: Stage1Data): Stage2Recommendations {
     );
   }
 
-  const utrogestanFailed = findPriorFailure(data.preferences.priorFailedTreatments, ['UTROGESTAN_ORAL']);
+  const utrogestanFailed = findDisqualifyingPriorFailure(data.preferences.priorFailedTreatments, [
+    'UTROGESTAN_ORAL'
+  ]);
   const blocksUtrogestan = data.medicalHistory.peanutOrSoyAllergy || Boolean(utrogestanFailed);
   if (blocksUtrogestan) {
     excludedReasonsAudit.push(
@@ -210,17 +264,27 @@ export function formulateTreatment(data: Stage1Data): Stage2Recommendations {
 
   const patchDisqualified =
     data.medicalHistory.patchAdhesiveSensitivity ||
-    Boolean(findPriorFailure(data.preferences.priorFailedTreatments, ['EVOREL_PATCH']));
+    Boolean(findDisqualifyingPriorFailure(data.preferences.priorFailedTreatments, ['EVOREL_PATCH']));
   if (patchDisqualified) {
-    excludedReasonsAudit.push('מדבקות עוריות (Evorel) סוננו עקב רגישות לדבק מדבקות או כישלון טיפול קודם.');
+    excludedReasonsAudit.push('מדבקות עוריות (Evorel) סוננו עקב רגישות לדבק מדבקות או אי-סבילות בטיפול קודם.');
   }
 
-  const gelFailed = findPriorFailure(data.preferences.priorFailedTreatments, ['ESTROGEL_SANDRENA']);
-  const mirenaFailed = findPriorFailure(data.preferences.priorFailedTreatments, ['MIRENA_IUS']);
-  const oralFemostonFailed = findPriorFailure(data.preferences.priorFailedTreatments, ['ORAL_FEMOSTON']);
-  const oralNetaFailed = findPriorFailure(data.preferences.priorFailedTreatments, ['ORAL_COMBINED_NETA']);
-  const veozaFailed = findPriorFailure(data.preferences.priorFailedTreatments, ['VEOZA_NK3']);
-  const ssriFailed = findPriorFailure(data.preferences.priorFailedTreatments, ['SSRI_SNRI']);
+  const gelFailed = findDisqualifyingPriorFailure(data.preferences.priorFailedTreatments, [
+    'ESTROGEL_SANDRENA'
+  ]);
+  const mirenaFailed = findDisqualifyingPriorFailure(data.preferences.priorFailedTreatments, ['MIRENA_IUS']);
+  const oralFemostonFailed = findDisqualifyingPriorFailure(data.preferences.priorFailedTreatments, [
+    'ORAL_FEMOSTON'
+  ]);
+  const oralNetaFailed = findDisqualifyingPriorFailure(data.preferences.priorFailedTreatments, [
+    'ORAL_COMBINED_NETA'
+  ]);
+  const oralSuboptimal = findSuboptimalPrior(data.preferences.priorFailedTreatments, [
+    'ORAL_COMBINED_NETA',
+    'ORAL_FEMOSTON'
+  ]);
+  const veozaFailed = findDisqualifyingPriorFailure(data.preferences.priorFailedTreatments, ['VEOZA_NK3']);
+  const ssriFailed = findDisqualifyingPriorFailure(data.preferences.priorFailedTreatments, ['SSRI_SNRI']);
 
   const prefersNonHormonal = data.preferences.hormoneAttitude === 'PREFERS_NON_HORMONAL';
   const prefersBodyIdentical = data.preferences.hormoneAttitude === 'PREFERS_BODY_IDENTICAL';
@@ -278,6 +342,12 @@ export function formulateTreatment(data: Stage1Data): Stage2Recommendations {
         pros.push('לאחר כריתת רחם: אסטרוגן בלבד ללא צורך בפרוגסטוגן וללא עלייה בסיכון לסרטן שד.');
       }
 
+      if (oralSuboptimal) {
+        score += 5;
+        matchReasons.push(
+          `נותן מענה ישיר לתגובה החלקית תחת ${oralSuboptimal.customName || 'טיפול פומי במינון קבוע'}: מאפשר טיטרציית אסטרדיול גמישה ללא מעבר ראשון בכבד וללא העלאת SHBG.`
+        );
+      }
       if (sym.hasSignificantSleepIssue && !blocksUtrogestan && needsEndometrialProtection) {
         score += 4;
         matchReasons.push('נותן מענה ישיר להפרעות השינה שדורגו בחשיבות גבוהה.');
@@ -530,7 +600,16 @@ export function formulateTreatment(data: Stage1Data): Stage2Recommendations {
       }
 
       if (oralNetaFailed && !oralFemostonFailed) {
-        excludedReasonsAudit.push(`Activelle/NETA סונן עקב ניסיון עבר שהופסק (${oralNetaFailed.reasonStopped}).`);
+        excludedReasonsAudit.push(
+          `Activelle/NETA סונן עקב אי-סבילות בטיפול עבר (${oralNetaFailed.reasonStopped}).`
+        );
+      }
+
+      if (oralSuboptimal) {
+        score -= 14;
+        cons.push(
+          `בניסיון קודם תחת ${oralSuboptimal.customName || 'טבליה פומית במינון קבוע'} הושגה הקלה חלקית בלבד (${oralSuboptimal.reasonStopped}) – אף שאין התווית נגד רפואית, מתן עורי עדיף לטיטרציית מינון ושימור טסטוסטרון חופשי.`
+        );
       }
 
       if (data.preferences.preferredRoute === 'ORAL_TABLET') {
@@ -544,7 +623,9 @@ export function formulateTreatment(data: Stage1Data): Stage2Recommendations {
         category: 'HORMONAL_SYSTEMIC',
         rankScore: clampScore(score),
         suitabilityBadge:
-          routePreference === 'TRANSDERMAL_PREFERRED' || prefersNonHormonal ? 'CONDITIONAL' : 'GOOD_ALTERNATIVE',
+          routePreference === 'TRANSDERMAL_PREFERRED' || prefersNonHormonal || Boolean(oralSuboptimal)
+            ? 'CONDITIONAL'
+            : 'GOOD_ALTERNATIVE',
         titleHebrew: !needsEndometrialProtection
           ? 'אסטרדיול פומי בלבד (Estrofem / Progynova)'
           : isPostmenopausalOver1Year
@@ -843,42 +924,37 @@ export function formulateTreatment(data: Stage1Data): Stage2Recommendations {
   }
 
   // =========================================================================
-  // מקטע נפרד לחלוטין: טסטוסטרון עורי נשי ל-HSDD (מוצג רק כאשר מותר רפואית למטופלת!)
+  // גישה מדורגת ל-HSDD בשלב 2 (NICE 2024 / BMS / IMS / ACOG 2026 / Srebnik):
+  // טסטוסטרון סיסטמי אינו ניתן כקו ראשון בשלב התחלת הטיפול! קודם מאזנים אסטרוגן עורי (שלא מעלה SHBG) + GSM;
+  // רק בשלב 3 (מעקב), אם HSDD ממשיך להטריד למרות טיפול מיטבי – תיפתח אפשרות הטסטוסטרון העורי.
   // =========================================================================
-  let testosteroneOption: TestosteroneHsddOption | undefined;
-  if (!hasBreastCaOrEndocrineTx && !liverBlocked) {
-    testosteroneOption = {
-      id: 'hsdd_transdermal_testosterone',
-      recommended: sym.hasSignificantHsdd,
-      titleHebrew: 'טסטוסטרון עורי במינון נשי פיזיולוגי (עבור HSDD – ירידה בתשוקה המינית הגורמת מצוקה)',
-      brandAndDoseHebrew: 'ג׳ל טסטוסטרון 1% (כגון AndroGel במינון נשי Off-label: ~5 מ"ג ליום = טיפה בגודל אפונה; שקית 50 מ"ג מספיקה ל-8–10 ימים)',
-      scheduleHebrew: 'מריחה יומית על עור נקי ויבש בירך החיצונית או השוק התחתונה',
-      prerequisitesHebrew: [
-        'להקפיד שהאסטרוגן הסיסטמי ניתן דרך העור (ג׳ל/מדבקה) ולא פומית – אסטרוגן פומי מעלה SHBG ומנטרל טסטוסטרון חופשי!',
-        'לוודא שקודם/במקביל ניתן מענה מלא ליובש או כאב נרתיקי (GSM).'
-      ],
-      prosHebrew: [
-        'הטיפול התרופתי המבוסס היחיד לשיפור חשק מיני, עוררות ושביעות רצון מינית בפוסט-מנופאוזה ולאחר כריתת שחלות (BSO/RRSO).'
-      ],
-      monitoringProtocolHebrew: [
-        'בדיקת דם ל-Total Testosterone (ו-SHBG) לפני תחילת הטיפול (בסיס).',
-        'בדיקת דם חוזרת כעבור 3–6 שבועות ובהמשך כל 6–12 חודשים לוודא שהרמה בטווח הפיזיולוגי של אישה צעירה.',
-        'ניסיון טיפולי של 3–6 חודשים (להפסיק אם אין שיפור קליני או אם מופיעים אקנה/שיעור יתר).'
-      ],
-      patientInstructionsHebrew:
-        'מרחי טיפה קטנה בגודל אפונה של ג׳ל טסטוסטרון (שקית אחת של 50 מ"ג מספיקה ל-8 עד 10 ימים!) על עור נקי בירך החיצונית/שוק מדי יום, שטפי ידיים במים וסבון מיד לאחר המריחה, ובצעי בדיקת דם לרמת טסטוסטרון בעוד 4–6 שבועות.'
-    };
+  const testosteroneOption: TestosteroneHsddOption | undefined = undefined;
+  let hsddStepwiseNoteHebrew: string | undefined;
+  if (sym.hasSignificantHsdd && !hasBreastCaOrEndocrineTx && !liverBlocked) {
+    hsddStepwiseNoteHebrew =
+      'גישה דו-שלבית לתלונת ירידה בחשק המיני (HSDD – לפי NICE 2024, BMS, IMS ו-ACOG 2026): בשלב הראשון (שלב 2) אין מתחילים טסטוסטרון סיסטמי, אלא מתעדפים אסטרדיול עורי (שאינו מעלה SHBG ואינו מפחית טסטוסטרון חופשי – בניגוד לאסטרוגן פומי!) יחד עם טיפול מקומי ביובש/כאב נרתיקי (GSM) ואיזון שינה. בביקור המעקב (שלב 3), במידה שירידת החשק המיני ממשיכה להטריד למרות איזון אסטרוגני ומקומי מיטבי – תוצע הוספת ניסיון מבוקר של 3–6 חודשים בטסטוסטרון עורי במינון נשי (~5 מ"ג/יום).';
   }
 
-  // נקודות תיאום ציפיות כלליות
+  // מערך המלצות אורח חיים, טיפולים משלימים מוכחים וצמחי מרפא (מבוסס אך ורק על מקורות תיקיית הידע!)
+  const holisticCare = buildHolisticCareSuite(data);
+
+  // נקודות תיאום ציפיות המותאמות אישית לפרופיל המטופלת (רחם שמור מול כריתת רחם, הורמונלי מול לא-הורמונלי)
+  const bleedingOrUterinePoint = mhtBlocked
+    ? !data.hadHysterectomy && (data.monthsSinceLastPeriod >= 12 || data.cyclePattern === 'AMENORRHEA_OVER_12_MONTHS')
+      ? 'מעקב גינקולוגי: הטיפול הלא-הורמונלי אינו גורם לדימום ווסתי – כל הופעת דימום נרתיקי מחייבת בדיקת רופא/ת נשים.'
+      : 'ניטור בטיחות: יש להקפיד על בדיקות המעקב והסקר המותאמות אישית שהוגדרו עבורך.'
+    : needsEndometrialProtection
+    ? endoRisk.riskTier === 'HIGH'
+      ? 'דימומים תחת טיפול הורמונלי: בשל גורמי סיכון לרירית הרחם, יש לדווח לרופא/ה על כל הופעת דימום בלתי צפוי לצורך בדיקת אולטרסאונד נרתיקי (TVS).'
+      : 'דימומים תחת טיפול הורמונלי: הכתמות קלות שכיחות ב-3–6 החודשים הראשונים; יש לדווח אם מופיע דימום כבד, ממושך או חדש לאחר חצי שנה.'
+    : 'לאחר כריתת רחם: הטיפול מבוסס על אסטרוגן בלבד ללא צורך בפרוגסטוגן וללא דימום צפוי (בכל הופעת הכתמה/דמם חריג יש לפנות לבדיקה).';
+
   const patientExpectationPoints: string[] = [
-    'ציר זמן לשיפור: הקלה ראשונית בגלי חום ושינה מתחילה תוך 2–4 שבועות, והשפעה מלאה מוערכת בביקור מעקב כעבור 3 חודשים.',
-    needsEndometrialProtection && !mhtBlocked
-      ? 'דימומים תחת טיפול הורמונלי: הכתמות קלות שכיחות ב-3–6 החודשים הראשונים; יש לדווח אם מופיע דימום כבד, ממושך או חדש לאחר חצי שנה.'
-      : 'ניטור בטיחות: יש להקפיד על בדיקות המעקב והסקר שהוגדרו עבורך.',
+    'ציר זמן לשיפור: הקלה ראשונית בגלי חום ושינה מתחילה תוך 1–4 שבועות (תחת ויוזה לרוב כבר בשבוע הראשון, ותחת MHT או SSRI/SNRI תוך 2–4 שבועות), והשפעה מלאה מוערכת בביקור מעקב כעבור 3 חודשים.',
+    bleedingOrUterinePoint,
     contraceptionEval.needsContraception
       ? `מניעת הריון: טיפול הורמונלי לגיל המעבר (HRT) אינו מונע הריון! ${contraceptionEval.contraceptionRuleHebrew}`
-      : 'אורח חיים תומך: אימוני כוח/התנגדות פעמיים-שלוש בשבוע, תזונה ים-תיכונית עשירה בסידן וחלבון ותוסף ויטמין D שומרים על העצם, השריר והלב.',
+      : '',
     boneRisk.riskTier !== 'LOW' ? boneRisk.guidanceHebrew : ''
   ].filter(Boolean);
 
@@ -906,6 +982,8 @@ export function formulateTreatment(data: Stage1Data): Stage2Recommendations {
     excludedReasonsAudit,
     localGsmOptions,
     testosteroneOption,
+    hsddStepwiseNoteHebrew,
+    holisticCare,
     patientExpectationPoints,
     followUpIntervalMonths: 3,
     emrSummaryText

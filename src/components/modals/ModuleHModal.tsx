@@ -413,9 +413,9 @@ export const ModuleHModal: React.FC<ModuleHModalProps> = ({ isOpen, onClose, rec
           {activeTab === 'ISRAELI_ARSENAL' && (
             <div className="space-y-2">
               <div className="p-2.5 rounded-xl bg-teal-50 border border-teal-200 text-teal-950 font-semibold">
-                מוצגים אך ורק תכשירים המתאימים לפרופיל הבטיחותי של {p.fullName || 'המטופלת'} (תכשירים שנפסלו עבורה סוננו אוטומטית).
+                מוצגים אך ורק תכשירים המתאימים לפרופיל הבטיחותי של {p.fullName || 'המטופלת'} (תכשירים שנפסלו עבורה סוננו אוטומטית; טסטוסטרון מיועד לשלב המעקב אם HSDD נמשך).
               </div>
-              {getEligibleArsenalForPatient(p).map((d) => {
+              {getEligibleArsenalForPatient(p, { includeStage3FollowUpDrugs: true }).map((d) => {
                 const relevantToChosen =
                   chosenOption &&
                   (chosenOption.israeliProductsSummary.primaryAgent

@@ -329,25 +329,28 @@ export const ISRAELI_DRUG_ARSENAL: IsraeliDrugItem[] = [
     cautionsAndContraindications: 'SERM פומי – אסור בסיכון VTE מוגבר ואסור בסרטן שד פעיל/חשוד.'
   },
 
-  // --- טיפול נפרד ב-HSDD (טסטוסטרון עורי נשי) ---
+  // --- טיפול נפרד ב-HSDD (טסטוסטרון עורי נשי – שלב שני במעקב לאחר מיצוי E2 + GSM) ---
   {
     id: 'testosterone_hsdd',
-    brandName: 'Transdermal Testosterone (Female Dose)',
-    hebrewName: 'טסטוסטרון עורי במינון נשי פיזיולוגי (ל-HSDD)',
+    brandName: 'Transdermal Testosterone (Female Dose – Stage 3 Follow-Up)',
+    hebrewName: 'טסטוסטרון עורי במינון נשי פיזיולוגי (ל-HSDD עמיד במעקב)',
     category: 'TESTOSTERONE_HSDD',
     activeIngredients: 'Testosterone Gel 1% (~5 מ"ג/יום – כ-1/10 ממנת גבר)',
     route: 'TRANSDERMAL_GEL',
     dosingSchedule:
-      'טיפה בגודל אפונה על הירך החיצונית/שוק תחתונה (שקית 50 מ"ג מספיקה ל-8–10 ימים), לאחר איזון אסטרוגן עורי וטיפול ב-GSM.',
+      'טיפה בגודל אפונה על הירך החיצונית/שוק תחתונה (שקית 50 מ"ג מספיקה ל-8–10 ימים) – ניתן כניסיון של 3–6 חודשים במעקב (שלב 3) רק אם HSDD נמשך למרות איזון אסטרוגן עורי וטיפול ב-GSM!',
     clinicalAdvantages:
-      'ההתוויה המבוססת היחידה: הפרעת חשק מיני ירוד הגורמת מצוקה (HSDD) בפוסט-מנופאוזה או לאחר BSO/RRSO.',
+      'ההתוויה המבוססת היחידה (NICE 2024 / BMS / IMS): הפרעת חשק מיני ירוד הגורמת מצוקה (HSDD) שלא חלפה לאחר מיצוי אסטרוגן סיסטמי וטיפול מקומי ב-GSM.',
     cautionsAndContraindications:
-      'בדיקת Total Testosterone בבסיס, כעבור 3–6 שבועות וכל 6–12 חודשים לשמירה בטווח הפיזיולוגי הנשי.'
+      'אין להתחיל כקו ראשון לפני מיצוי אסטרוגן + GSM; מחייב בדיקת Total Testosterone ו-SHBG בבסיס, כעבור 3–6 שבועות וכל 6–12 חודשים.'
   }
 ];
 
-// סינון קשיח של פורמולריום התרופות כך שיוצגו אך ורק תכשירים מתאימים שלא נפסלו עבור המטופלת!
-export function getEligibleArsenalForPatient(data: Stage1Data): IsraeliDrugItem[] {
+// סינון קשיח של פורמולריום התרופות כך שיוצגו אך ורק תכשירים מתאימים שלא נפסלו רפואית עבור המטופלת!
+export function getEligibleArsenalForPatient(
+  data: Stage1Data,
+  options?: { includeStage3FollowUpDrugs?: boolean }
+): IsraeliDrugItem[] {
   const gate = evaluateCompletenessGate(data);
   const vte = calculateVteRisk(data);
   const prevent = calculateAhaPreventRisk(data);
@@ -371,7 +374,13 @@ export function getEligibleArsenalForPatient(data: Stage1Data): IsraeliDrugItem[
   const ckdOrAceArb =
     data.medicalHistory.chronicKidneyDiseaseOrSolitaryKidney ||
     data.medications.takingAceArbOrPotassiumSparing;
-  const failedKeys = new Set(data.preferences.priorFailedTreatments.map((f) => f.treatmentKey));
+
+  // פסילה קשיחה חלה רק על תכשירים שהופסקו בשל תופעות לוואי / אי-סבילות / אלרגיה (ולא בשל תגובה חלקית בלבד במינון קבוע!)
+  const hardDisqualifiedKeys = new Set(
+    data.preferences.priorFailedTreatments
+      .filter((f) => f.stopReasonCategory !== 'SUBOPTIMAL_EFFICACY')
+      .map((f) => f.treatmentKey)
+  );
 
   return ISRAELI_DRUG_ARSENAL.filter((item) => {
     // 1. אם MHT סיסטמי אסור – סנן את כל התכשירים ההורמונליים הסיסטמיים
@@ -395,15 +404,18 @@ export function getEligibleArsenalForPatient(data: Stage1Data): IsraeliDrugItem[
       return false;
     }
 
-    // 4. אלרגיה לבוטנים/סויה או כישלון אוטרוגסטן -> סנן אוטרוגסטן
-    if (item.id === 'utrogestan' && (data.medicalHistory.peanutOrSoyAllergy || failedKeys.has('UTROGESTAN_ORAL'))) {
+    // 4. אלרגיה לבוטנים/סויה או אי-סבילות לאוטרוגסטן -> סנן אוטרוגסטן
+    if (
+      item.id === 'utrogestan' &&
+      (data.medicalHistory.peanutOrSoyAllergy || hardDisqualifiedKeys.has('UTROGESTAN_ORAL'))
+    ) {
       return false;
     }
 
-    // 5. רגישות לדבק מדבקות או כישלון מדבקות -> סנן מדבקות
+    // 5. רגישות לדבק מדבקות או פריחה ממדבקות -> סנן מדבקות
     if (
       item.route === 'TRANSDERMAL_PATCH' &&
-      (data.medicalHistory.patchAdhesiveSensitivity || failedKeys.has('EVOREL_PATCH'))
+      (data.medicalHistory.patchAdhesiveSensitivity || hardDisqualifiedKeys.has('EVOREL_PATCH'))
     ) {
       return false;
     }
@@ -419,7 +431,10 @@ export function getEligibleArsenalForPatient(data: Stage1Data): IsraeliDrugItem[
     }
 
     // 8. מחלת כבד או תפקודי כבד חריגים -> סנן ויוזה / לינקואט
-    if ((item.id === 'veoza' || item.id === 'lynkuet') && (liverBlocked || failedKeys.has('VEOZA_NK3'))) {
+    if (
+      (item.id === 'veoza' || item.id === 'lynkuet') &&
+      (liverBlocked || hardDisqualifiedKeys.has('VEOZA_NK3'))
+    ) {
       return false;
     }
 
@@ -435,19 +450,25 @@ export function getEligibleArsenalForPatient(data: Stage1Data): IsraeliDrugItem[
     if (data.medications.takingAromataseInhibitors && item.id === 'vagifem_ovestin_imvaggis') {
       return false;
     }
-    if ((vte.mandatoryTransdermal || data.monthsSinceLastPeriod < 12) && item.id === 'ospemifene') {
-      return false;
-    }
-    if (liverBlocked && item.id === 'testosterone_hsdd') {
+    if ((vte.mandatoryTransdermal || data.monthsSinceLastPeriod < 12 || data.bmi >= 30) && item.id === 'ospemifene') {
       return false;
     }
 
-    // 10. סינון תכשירים שנוסו ונכשלו בעבר
-    if (item.id === 'femoston_family' && failedKeys.has('ORAL_FEMOSTON')) return false;
-    if (item.id === 'activelle_eviana_novofem' && failedKeys.has('ORAL_COMBINED_NETA')) return false;
-    if (item.id === 'mirena' && failedKeys.has('MIRENA_IUS')) return false;
-    if ((item.id === 'estrogel' || item.id === 'sandrena') && failedKeys.has('ESTROGEL_SANDRENA')) return false;
-    if (item.id === 'venlafaxine_escitalopram' && failedKeys.has('SSRI_SNRI')) return false;
+    // 10. טסטוסטרון עורי מיועד לשלב המעקב (שלב 3) לאחר מיצוי אסטרוגן + GSM, ולא כקו ראשון בשלב 2!
+    if (item.id === 'testosterone_hsdd') {
+      if (liverBlocked || !options?.includeStage3FollowUpDrugs) {
+        return false;
+      }
+    }
+
+    // 11. סינון תכשירים שנפסלו בשל אי-סבילות / תופעות לוואי קשות בעבר
+    if (item.id === 'femoston_family' && hardDisqualifiedKeys.has('ORAL_FEMOSTON')) return false;
+    if (item.id === 'activelle_eviana_novofem' && hardDisqualifiedKeys.has('ORAL_COMBINED_NETA')) return false;
+    if (item.id === 'mirena' && hardDisqualifiedKeys.has('MIRENA_IUS')) return false;
+    if ((item.id === 'estrogel' || item.id === 'sandrena') && hardDisqualifiedKeys.has('ESTROGEL_SANDRENA')) {
+      return false;
+    }
+    if (item.id === 'venlafaxine_escitalopram' && hardDisqualifiedKeys.has('SSRI_SNRI')) return false;
 
     return true;
   });

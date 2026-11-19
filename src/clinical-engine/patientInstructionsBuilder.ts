@@ -1,8 +1,10 @@
 import { evaluateCompletenessGate } from './completenessGate';
 import { checkDrugInteractions } from './drugInteractions';
+import { buildHolisticCareSuite } from './holisticLifestyleEngine';
 import { calculateAhaPreventRisk } from './riskCalculators';
 import { evaluateContraceptionAndMirena, evaluateSTRAWStage } from './strawStaging';
 import {
+  ComplementaryTherapyOption,
   LocalGsmOption,
   LongitudinalVisit,
   SelectedTreatmentPlan,
@@ -21,7 +23,57 @@ export interface PatientInstructionsOutput {
   formattedPlainText: string;
 }
 
-// 1. פלט הנחיות למטופלת בשלב 1 – הבדיקות הנדרשות להשלמה והכנה לקראת הטיפול
+function buildTailoredRedFlagsBullet(
+  data: Stage1Data,
+  chosenOption?: TreatmentOptionCard,
+  stageLabel: 'STAGE2' | 'STAGE3' = 'STAGE2'
+): string {
+  const isHormonal = chosenOption?.category === 'HORMONAL_SYSTEMIC';
+  const isNk3 = Boolean(chosenOption?.id.includes('nk3'));
+  const isSnriSsri = Boolean(chosenOption?.id.includes('snri_ssri'));
+  const hasUterusOrCervix = !data.hadHysterectomy || Boolean(data.cervixConserved);
+  const isPostmenopausal =
+    data.monthsSinceLastPeriod >= 12 || data.cyclePattern === 'AMENORRHEA_OVER_12_MONTHS' || data.hadBsoOrRrso;
+
+  const flags: string[] = [];
+
+  if (isHormonal) {
+    if (hasUterusOrCervix) {
+      flags.push('דימום נרתיקי כבד, ממושך או דימום חדש המופיע לאחר 6 חודשי טיפול');
+    } else {
+      flags.push('כל הופעת דימום נרתיקי חריג');
+    }
+    flags.push('גוש או שינוי חדש בשד');
+    flags.push('כאב/אודם/נפיחות חריגה בשוק הרגל, קוצר נשימה או כאב בחזה');
+    flags.push('כאב ראש חריף חדש או הפרעת ראייה פתאומית');
+  } else {
+    if (hasUterusOrCervix && isPostmenopausal) {
+      flags.push('כל הופעה של דימום נרתיקי (הטיפול הלא-הורמונלי אינו גורם לדימום)');
+    }
+    if (!data.medicalHistory.breastCancerHistory) {
+      flags.push('גוש או שינוי חדש בשד');
+    } else {
+      flags.push('כל ממצא חדש בשד או בצלקת הניתוחית (לעדכן מיד את הצוות האונקולוגי/כירורג השד)');
+    }
+    if (isNk3) {
+      flags.push(
+        'סימני אזהרה כבדיים תחת ויוזה/לינקואט: עייפות חריגה, בחילה מתמשכת, גרד, שתן כהה או הצהבת עור/עיניים (להפסיק מיד ולפנות לרופא/ה!)'
+      );
+    }
+    if (isSnriSsri) {
+      flags.push('עלייה משמעותית בלחץ הדם או תופעות לוואי מתמשכות (אין להפסיק את הכדור בבת אחת ללא הנחיה)');
+    }
+  }
+
+  const prefix =
+    stageLabel === 'STAGE2'
+      ? 'סימני אזהרה המחייבים פנייה מוקדמת לרופא/ה (לפני ביקור המעקב בעוד 3 חודשים): '
+      : 'סימני אזהרה המחייבים פנייה מוקדמת לרופא/ה בין ביקורי המעקב: ';
+
+  return `${prefix}${flags.join(', ')}.`;
+}
+
+// 1. פלט הנחיות למטופלת בשלב 1 – הבדיקות הנדרשות להשלמה והכנה לקראת הטיפול (מותאם אישית לפרופיל המטופלת!)
 export function buildStage1PatientInstructions(data: Stage1Data): PatientInstructionsOutput {
   const gate = evaluateCompletenessGate(data);
   const prevent = calculateAhaPreventRisk(data);
@@ -67,7 +119,7 @@ export function buildStage1PatientInstructions(data: Stage1Data): PatientInstruc
   }
 
   if (bullets.length === 0) {
-    bullets.push('כל בדיקות הבסיס והסקר הרלוונטיות לגילך מעודכנות ותקינות – אין צורך בהשלמת בדיקות מקדימות נוספות כעת.');
+    bullets.push('כל בדיקות הבסיס והסקר הרלוונטיות לפרופיל הרפואי שלך מעודכנות ותקינות – אין צורך בהשלמת בדיקות מקדימות נוספות כעת.');
   }
 
   const freeText = (data.stage1PatientInstructionsFreeText || '').trim();
@@ -80,14 +132,14 @@ export function buildStage1PatientInstructions(data: Stage1Data): PatientInstruc
   return {
     stage: 1,
     titleHebrew: 'פלט הנחיות למטופלת (שלב 1): בדיקות להשלמה והכנה להחלטה טיפולית',
-    subtitleHebrew: 'רשימה מותאמת אישית של בדיקות מעבדה, הדמיה וסקר הנדרשות לפי גילך ונתונייך הרפואיים',
+    subtitleHebrew: 'רשימה מותאמת אישית של בדיקות מעבדה, הדמיה ומעקב הנדרשות לפי נתונייך הרפואיים',
     structuredBullets: bullets,
     physicianFreeText: freeText,
     formattedPlainText: lines.join('\n')
   };
 }
 
-// 2. פלט הנחיות למטופלת בשלב 2 – הנחיות מפורטות לדרך הטיפול שנבחר, שילובים מקומיים ותיאום ציפיות
+// 2. פלט הנחיות למטופלת בשלב 2 – הנחיות מפורטות לדרך הטיפול שנבחר, שילובים מקומיים, אורח חיים, טיפולים משלימים ותיאום ציפיות
 export function buildStage2PatientInstructions(
   data: Stage1Data,
   recs: Stage2Recommendations,
@@ -101,8 +153,10 @@ export function buildStage2PatientInstructions(
     selectedPlan?.selectedGsmOptionIds?.includes(g.id)
   );
 
-  const chosenTesto: TestosteroneHsddOption | undefined =
-    selectedPlan?.includeTestosterone && recs.testosteroneOption ? recs.testosteroneOption : undefined;
+  const chosenComplementary: ComplementaryTherapyOption[] =
+    recs.holisticCare.complementaryTherapies.filter((c) =>
+      selectedPlan?.selectedComplementaryIds?.includes(c.id)
+    );
 
   const bullets: string[] = [];
 
@@ -117,42 +171,52 @@ export function buildStage2PatientInstructions(
     bullets.push(`טיפול מקומי משולב (${gsm.titleHebrew}): ${gsm.patientInstructionsHebrew}`);
   }
 
-  if (chosenTesto) {
-    bullets.push(`טיפול בחשק המיני (${chosenTesto.titleHebrew}): ${chosenTesto.patientInstructionsHebrew}`);
+  for (const comp of chosenComplementary) {
+    bullets.push(`טיפול משלים מבוסס-ראיות (${comp.titleHebrew}): ${comp.patientInstructionsHebrew}`);
+  }
+
+  // הוספת המלצות אורח חיים מותאמות אישית למטופלת
+  for (const life of recs.holisticCare.lifestyleItems) {
+    bullets.push(life.patientInstructionHebrew);
+  }
+
+  if (recs.hsddStepwiseNoteHebrew) {
+    bullets.push(
+      'מעקב אחר החשק המיני: תחילה מאזנים את רמות האסטרוגן דרך העור והנוחות המקומית בנרתיק; בביקור המעקב בעוד 3 חודשים נבחן את השיפור ונשקול במידת הצורך תוספת ייעודית לחשק המיני.'
+    );
   }
 
   for (const exp of recs.patientExpectationPoints) {
     bullets.push(exp);
   }
 
-  bullets.push(
-    'סימני אזהרה המחייבים פנייה מוקדמת לרופא/ה (לפני ביקור המעקב בעוד 3 חודשים): דימום נרתיקי כבד או ממושך, גוש/שינוי בשד, כאב או נפיחות חריגה בשוק הרגל, כאב בחזה/קוצר נשימה, כאב ראש חריף חדש, או (תחת ויוזה) שתן כהה/צהבת/עייפות חריגה.'
-  );
+  bullets.push(buildTailoredRedFlagsBullet(data, chosenPrimary, 'STAGE2'));
 
   const freeText = (selectedPlan?.stage2PatientInstructionsFreeText || '').trim();
   const lines = [
-    `תוכנית טיפול והנחיות נטילה אישיות – ${data.fullName || 'מטופלת'}`,
+    `תוכנית טיפול, אורח חיים והנחיות נטילה אישיות – ${data.fullName || 'מטופלת'}`,
     ...bullets.map((b, idx) => `${idx + 1}. ${b}`),
     ...(freeText ? [`\nהנחיות והערות אישיות מהרופא/ה:\n${freeText}`] : [])
   ];
 
   return {
     stage: 2,
-    titleHebrew: 'פלט הנחיות למטופלת (שלב 2): אופן נטילת הטיפול, שילובים ותיאום ציפיות',
-    subtitleHebrew: 'הוראות שימוש מדויקות לתכשירים שנבחרו עבורך ולוח זמנים למעקב',
+    titleHebrew: 'פלט הנחיות למטופלת (שלב 2): אופן נטילת הטיפול, שילובים, אורח חיים ותיאום ציפיות',
+    subtitleHebrew: 'הוראות שימוש מדויקות לתכשירים, לטיפולים המשלימים ולאורח החיים המותאמים עבורך',
     structuredBullets: bullets,
     physicianFreeText: freeText,
     formattedPlainText: lines.join('\n')
   };
 }
 
-// 3. פלט הנחיות למטופלת בשלב 3 – הנחיות למעקב, עדכון הטיפול ובדיקות בקרה
+// 3. פלט הנחיות למטופלת בשלב 3 – הנחיות למעקב, עדכון הטיפול (כולל טסטוסטרון אם נוסף במעקב) ובדיקות בקרה
 export function buildStage3PatientInstructions(
   data: Stage1Data,
   visitInput: {
     updatedRegimenText: string;
     selectedOption?: TreatmentOptionCard;
     selectedGsmOptions?: LocalGsmOption[];
+    selectedComplementaryIds?: string[];
     includeTestosterone?: boolean;
     testosteroneOption?: TestosteroneHsddOption;
     urgentTvsIndicated?: boolean;
@@ -163,6 +227,7 @@ export function buildStage3PatientInstructions(
     patientFollowUpInstructionsFreeText?: string;
   }
 ): PatientInstructionsOutput {
+  const holistic = buildHolisticCareSuite(data);
   const bullets: string[] = [];
 
   bullets.push(`הנחיית המשך/עדכון הטיפול: ${visitInput.updatedRegimenText}`);
@@ -181,6 +246,14 @@ export function buildStage3PatientInstructions(
 
   if (visitInput.includeTestosterone && visitInput.testosteroneOption) {
     bullets.push(visitInput.testosteroneOption.patientInstructionsHebrew);
+  }
+
+  if (visitInput.selectedComplementaryIds && visitInput.selectedComplementaryIds.length > 0) {
+    for (const comp of holistic.complementaryTherapies) {
+      if (visitInput.selectedComplementaryIds.includes(comp.id)) {
+        bullets.push(`טיפול משלים (${comp.titleHebrew}): ${comp.patientInstructionsHebrew}`);
+      }
+    }
   }
 
   if (visitInput.urgentTvsIndicated) {
@@ -209,15 +282,18 @@ export function buildStage3PatientInstructions(
     bullets.push('להמשיך מעקב בדיקות דם לתפקודי כבד (ALT, AST ובילירובין) במועדים חודשים 1, 2, 3, 6 ו-9 לתחילת הטיפול.');
   }
 
+  // הוספת דגשי אורח חיים בעדיפות גבוהה למטופלת במעקב
+  for (const life of holistic.lifestyleItems.filter((l) => l.priority === 'HIGH')) {
+    bullets.push(life.patientInstructionHebrew);
+  }
+
   const nextVisitTiming =
-    visitInput.medicationAction === 'CONTINUE_SAME' && !visitInput.urgentTvsIndicated
-      ? 'מועד ביקורת המעקב הבא: בעוד 6–12 חודשים (למעקב שנתי אחר מדדים, בדיקות סקר והמשך התאמת הטיפול).'
-      : 'מועד ביקורת המעקב הבא: בעוד 3 חודשים לבחינת ההשפעה של עדכון המינון / החלפת התכשיר.';
+    visitInput.medicationAction === 'CONTINUE_SAME' && !visitInput.urgentTvsIndicated && !visitInput.includeTestosterone
+      ? 'מועד ביקורת המעקב הבא: בעוד 6–12 חודשים (למעקב שנתי אחר מדדים, בדיקות סקר מותאמות אישית והמשך התאמת הטיפול).'
+      : 'מועד ביקורת המעקב הבא: בעוד 3 חודשים לבחינת ההשפעה של עדכון המינון / החלפת התכשיר / ניסיון הטסטוסטרון.';
   bullets.push(nextVisitTiming);
 
-  bullets.push(
-    'יש לפנות לבדיקה מוקדמת בכל הופעה של דימום נרתיקי כבד/חריג, ממצא חדש בשד, כאב/נפיחות בשוק, קוצר נשימה או כאב בחזה.'
-  );
+  bullets.push(buildTailoredRedFlagsBullet(data, visitInput.selectedOption, 'STAGE3'));
 
   const freeText = (visitInput.patientFollowUpInstructionsFreeText || '').trim();
   const lines = [
@@ -228,7 +304,7 @@ export function buildStage3PatientInstructions(
 
   return {
     stage: 3,
-    titleHebrew: 'פלט הנחיות למטופלת (שלב 3): הנחיות להמשך הטיפול ומעקב',
+    titleHebrew: 'פלט הנחיות למטופלת (שלב 3): הנחיות להמשך הטיפול, אורח חיים ומעקב',
     subtitleHebrew: 'סיכום עדכון התרופות, בדיקות הבקרה הנדרשות ומועד המפגש הבא עבור המטופלת',
     structuredBullets: bullets,
     physicianFreeText: freeText,

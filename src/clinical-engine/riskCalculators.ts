@@ -648,13 +648,35 @@ export function calculateBoneRisk(data: Stage1Data): BoneRiskAssessment {
       ? 'MODERATE'
       : 'LOW';
 
-  let guidanceHebrew = 'סיכון בסיסי תקין לעצם; להקפיד על פעילות גופנית נושאת משקל/התנגדות, סידן 1000–1200 מ"ג/יום וויטמין D 800–1000 יחב"ל/יום.';
-  if (riskTier === 'HIGH') {
-    guidanceHebrew =
-      'סיכון גבוה לאיבוד מסת עצם/שברים: מומלץ לבצע DXA + חישוב FRAX ישראל, להבטיח ויטמין D וסידן; מתחת לגיל 60 MHT במינון תקני/פיזיולוגי מהווה טיפול קו ראשון יעיל למניעת שברים!';
+  const mhtContraindicatedForBone =
+    data.medicalHistory.breastCancerHistory ||
+    data.medications.takingTamoxifen ||
+    data.medications.takingAromataseInhibitors ||
+    data.medicalHistory.endometrialCancerHistory === 'ADVANCED_OR_SARCOMA' ||
+    data.medicalHistory.ovarianCancerHistory === 'HORMONE_SENSITIVE_SEROUS_ENDOMETRIOID' ||
+    data.medicalHistory.activeAcuteVte ||
+    data.medicalHistory.activeOrRecentArterialEvent ||
+    data.medicalHistory.activeLiverDiseaseOrPorphyria ||
+    data.medicalHistory.sleActiveOrAplaPositive;
+
+  const dxaActionPhrase =
+    data.dxaStatus === 'NOT_PERFORMED'
+      ? 'להשלים בדיקת צפיפות עצם (DXA) וחישוב FRAX ישראל'
+      : 'להמשיך מעקב צפיפות עצם (DXA) תקופתי וחישוב FRAX';
+
+  let guidanceHebrew =
+    'סיכון בסיסי תקין לעצם; להקפיד על פעילות גופנית נושאת משקל/התנגדות, סידן 1,000–1,200 מ"ג/יום וויטמין D 800–1,000 יחב"ל/יום.';
+
+  if (mhtContraindicatedForBone) {
+    if (data.medications.takingAromataseInhibitors) {
+      guidanceHebrew = `סיכון מואץ לאיבוד עצם תחת מעכבי ארומטאז (1%–3% בשנה): מומלץ ${dxaActionPhrase}, להקפיד על סידן (1,000–1,200 מ"ג/יום), ויטמין D (800–1,000 יחב"ל/יום) ואימוני התנגדות, ולשקול טיפול מגן-עצם לא-הורמונלי (ביספוספונטים או דנוסומאב – לפי NICE NG101 כבר מ-T-score ≤ -1.5!).`;
+    } else if (riskTier !== 'LOW') {
+      guidanceHebrew = `שמירה על בריאות העצם (ללא MHT בשל התווית נגד): מומלץ ${dxaActionPhrase}, להבטיח סידן (1,000–1,200 מ"ג/יום), ויטמין D (800–1,000 יחב"ל/יום) ואימוני התנגדות, ובמידת הצורך טיפול תרופתי ייעודי לעצם (ביספוספונטים / דנוסומאב).`;
+    }
+  } else if (riskTier === 'HIGH') {
+    guidanceHebrew = `סיכון גבוה לאיבוד מסת עצם/שברים: מומלץ ${dxaActionPhrase}, להבטיח ויטמין D וסידן; מתחת לגיל 60 MHT במינון תקני/פיזיולוגי מפחית שברים בכ-30% (ומעל גיל 60 או בסיכון שבר גבוה לשקול ביספוספונטים לפי NOGG/IMA).`;
   } else if (riskTier === 'MODERATE') {
-    guidanceHebrew =
-      'קיימים גורמי סיכון לירידה בצפיפות העצם: מומלץ להשלים בדיקת DXA + FRAX ולשלב אימוני התנגדות, סידן וויטמין D (ל-MHT יתרון מובהק בשימור העצם).';
+    guidanceHebrew = `קיימים גורמי סיכון לירידה בצפיפות העצם: מומלץ ${dxaActionPhrase} ולשלב אימוני התנגדות, סידן וויטמין D (ל-MHT יתרון מוכח בשימור צפיפות העצם).`;
   }
 
   return {

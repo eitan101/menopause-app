@@ -121,6 +121,9 @@ export const Stage3View: React.FC<Stage3ViewProps> = ({
   const [selectedGsmIds, setSelectedGsmIds] = useState<string[]>(
     () => selectedPlan?.selectedGsmOptionIds || []
   );
+  const [selectedComplementaryIds, setSelectedComplementaryIds] = useState<string[]>(
+    () => selectedPlan?.selectedComplementaryIds || []
+  );
   const [includeTestosterone, setIncludeTestosterone] = useState<boolean>(
     () => Boolean(selectedPlan?.includeTestosterone)
   );
@@ -235,6 +238,7 @@ export const Stage3View: React.FC<Stage3ViewProps> = ({
         updatedRegimenText: effectiveUpdatedRegimenText,
         selectedOption: chosenFollowUpOption,
         selectedGsmOptions: chosenGsmObjects,
+        selectedComplementaryIds,
         includeTestosterone: includeTestosterone && Boolean(decisionSuite.testosteroneOption),
         testosteroneOption: decisionSuite.testosteroneOption,
         urgentTvsIndicated: Boolean(decisionSuite.bleedingTriage?.tvsIndicated),
@@ -249,6 +253,7 @@ export const Stage3View: React.FC<Stage3ViewProps> = ({
       effectiveUpdatedRegimenText,
       chosenFollowUpOption,
       chosenGsmObjects,
+      selectedComplementaryIds,
       includeTestosterone,
       decisionSuite.testosteroneOption,
       decisionSuite.bleedingTriage,
@@ -278,6 +283,12 @@ export const Stage3View: React.FC<Stage3ViewProps> = ({
 
   const toggleGsmId = (id: string) => {
     setSelectedGsmIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const toggleComplementaryId = (id: string) => {
+    setSelectedComplementaryIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
   };
@@ -352,6 +363,7 @@ export const Stage3View: React.FC<Stage3ViewProps> = ({
       switchedToOptionId:
         derivedAction === 'SWITCH_DRUG_OR_ROUTE' ? chosenFollowUpOption?.id : undefined,
       selectedGsmOptionIds: selectedGsmIds,
+      selectedComplementaryIds,
       includeTestosterone: includeTestosterone && Boolean(decisionSuite.testosteroneOption),
       selectionRationaleTags: rationaleTags,
       selectionRationaleFreeText: rationaleFreeText,
@@ -374,6 +386,7 @@ export const Stage3View: React.FC<Stage3ViewProps> = ({
     const updatedPlan: SelectedTreatmentPlan = {
       selectedPrimaryOptionId: mappedPrimaryId,
       selectedGsmOptionIds: selectedGsmIds,
+      selectedComplementaryIds,
       includeTestosterone: includeTestosterone && Boolean(decisionSuite.testosteroneOption),
       selectionRationaleTags: rationaleTags,
       selectionRationaleFreeText: rationaleFreeText,
@@ -1152,29 +1165,87 @@ export const Stage3View: React.FC<Stage3ViewProps> = ({
           </div>
         </div>
 
-        {/* סקשן נפרד לטסטוסטרון עורי נשי ל-HSDD במעקב */}
+        {/* סקשן נפרד לטסטוסטרון עורי נשי ל-HSDD עמיד בשלב המעקב (נפתח רק אם ירידת החשק נמשכת במעקב!) */}
         {decisionSuite.testosteroneOption && (
-          <div className="bg-white rounded-2xl border border-rose-200 shadow-sm p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-            <div className="flex items-start gap-2">
-              <Flame className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-              <div>
-                <div className="font-bold text-slate-900">{decisionSuite.testosteroneOption.titleHebrew}</div>
-                <p className="text-slate-600">{decisionSuite.testosteroneOption.brandAndDoseHebrew}</p>
+          <div
+            className={`rounded-2xl border p-5 space-y-3 text-xs transition ${
+              includeTestosterone
+                ? 'bg-rose-50/70 border-rose-500 ring-1 ring-rose-400 shadow-sm'
+                : 'bg-white border-rose-200 shadow-sm'
+            }`}
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-rose-100 pb-2.5">
+              <div className="flex items-center gap-2">
+                <Flame className="w-5 h-5 text-rose-600 shrink-0" />
+                <div>
+                  <div className="font-extrabold text-slate-900 text-sm">
+                    {decisionSuite.testosteroneOption.titleHebrew}
+                  </div>
+                  <p className="text-[11px] text-slate-600">
+                    נפתח בשלב המעקב בעקבות המשך תלונת ירידה בחשק המיני (HSDD) למרות הטיפול הראשוני (NICE 2024 / BMS / IMS)
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIncludeTestosterone(!includeTestosterone)}
+                className={`py-2 px-4 rounded-xl font-bold border shrink-0 transition ${
+                  includeTestosterone
+                    ? 'bg-rose-700 text-white border-rose-700'
+                    : 'bg-white text-rose-900 border-rose-300 hover:bg-rose-50'
+                }`}
+              >
+                {includeTestosterone ? 'טסטוסטרון עורי משולב במעקב ✓' : '+ הוסף ניסיון 3–6 חודשים בטסטוסטרון ל-HSDD'}
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <p className="font-semibold text-rose-900">{decisionSuite.testosteroneOption.brandAndDoseHebrew}</p>
+                <p className="text-slate-700">{decisionSuite.testosteroneOption.scheduleHebrew}</p>
+                {decisionSuite.testosteroneOption.prerequisitesHebrew.map((pr, idx) => (
+                  <p key={idx} className="text-[11px] text-slate-600">
+                    • {pr}
+                  </p>
+                ))}
+              </div>
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1">
+                <strong className="text-slate-800">ניטור מעבדה מחייב (Total Testosterone + SHBG):</strong>
+                {decisionSuite.testosteroneOption.monitoringProtocolHebrew.map((m, idx) => (
+                  <p key={idx} className="text-[11px] text-slate-700">
+                    • {m}
+                  </p>
+                ))}
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => setIncludeTestosterone(!includeTestosterone)}
-              className={`py-2 px-4 rounded-xl font-bold border shrink-0 transition ${
-                includeTestosterone
-                  ? 'bg-rose-700 text-white border-rose-700'
-                  : 'bg-white text-rose-900 border-rose-300 hover:bg-rose-50'
-              }`}
-            >
-              {includeTestosterone ? 'טסטוסטרון עורי משולב ✓' : '+ הוסף טסטוסטרון ל-HSDD'}
-            </button>
           </div>
         )}
+
+        {/* שילוב טיפולים משלימים מוכחים (CBT, היפנוזה קלינית, מיינדפולנס, דיקור) במעקב */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-2.5 text-xs">
+          <div className="font-bold text-slate-800">
+            שילוב טיפולים משלימים שהוכחו כיעילים (ACOG 2026 / BMS 2026 / NICE 2024):
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {decisionSuite.holisticCare.complementaryTherapies.map((comp) => {
+              const active = selectedComplementaryIds.includes(comp.id);
+              return (
+                <button
+                  key={comp.id}
+                  type="button"
+                  onClick={() => toggleComplementaryId(comp.id)}
+                  className={`px-3 py-1.5 rounded-xl border font-bold text-[11px] transition ${
+                    active
+                      ? 'bg-indigo-700 text-white border-indigo-700'
+                      : 'bg-slate-50 text-slate-700 border-slate-300 hover:bg-slate-100'
+                  }`}
+                >
+                  {active ? `✓ ${comp.titleHebrew}` : `+ ${comp.titleHebrew}`}
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
         {/* תיעוד נימוק ההחלטה במעקב + יומן הערות מתוארך */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 text-xs">
