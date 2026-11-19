@@ -129,7 +129,7 @@ export function createEmptyContraception(): ContraceptionData {
     currentMethod: 'NONE',
     mirenaInsertionDate: '',
     needsContraceptionCounseling: false,
-    sexuallyActiveWithPregnancyRisk: true,
+    sexuallyActiveWithPregnancyRisk: false,
     notes: ''
   };
 }
@@ -153,7 +153,7 @@ export function createEmptyFamilyHistory(): FamilyHistoryData {
 
 export function createEmptyPreferences(): PatientPreferencesData {
   return {
-    hormoneAttitude: 'OPEN_TO_MHT',
+    hormoneAttitude: 'UNDECIDED',
     preferredRoute: 'NO_PREFERENCE',
     bleedingPreference: 'NO_PREFERENCE',
     priorFailedTreatments: [],
@@ -175,37 +175,38 @@ export function createEmptyPreventInputs(): PreventCalculatorInputs {
   };
 }
 
+// תיק ריק לחלוטין ללא שום שדה ממולא מראש – מופעל בעת לחיצה על "חדשה" (איפוס תיק מטופלת)
 export function createBlankStage1Data(): Stage1Data {
   return {
     patientId: '',
     fullName: '',
-    age: 50,
+    age: 0,
     occupation: '',
     ethnicity: 'OTHER',
-    weightKg: 68,
-    heightCm: 164,
-    bmi: 25.3,
-    bpSystolic: 122,
-    bpDiastolic: 78,
+    weightKg: 0,
+    heightCm: 0,
+    bmi: 0,
+    bpSystolic: 0,
+    bpDiastolic: 0,
     isSmoker: false,
     alcoholUnitsPerWeek: 0,
-    nutritionQuality: 'HEALTHY',
+    nutritionQuality: 'AVERAGE',
     exerciseRegular: false,
     demographicsLifestyleNotes: '',
 
-    gravida: 2,
-    para: 2,
+    gravida: 0,
+    para: 0,
     abortions: 0,
-    menarcheAge: 13,
+    menarcheAge: 0,
     hadHysterectomy: false,
     cervixConserved: false,
     hadBsoOrRrso: false,
     rrsoAge: undefined,
     lastPeriodDate: '',
-    cyclePattern: 'SKIPPED_OVER_60_DAYS',
-    bleedingIntensity: 'NORMAL',
-    monthsSinceLastPeriod: 4,
-    yearsOnSequentialHrt: 0,
+    cyclePattern: 'REGULAR',
+    bleedingIntensity: 'NONE',
+    monthsSinceLastPeriod: 0,
+    yearsOnSequentialHrt: undefined,
     contraception: createEmptyContraception(),
     menstrualStageNotes: '',
 
@@ -218,20 +219,22 @@ export function createBlankStage1Data(): Stage1Data {
     preventInputs: createEmptyPreventInputs(),
     preferences: createEmptyPreferences(),
 
-    mammographyStatus: 'UP_TO_DATE_NORMAL',
+    mammographyStatus: 'NOT_PERFORMED',
     lastMammographyDate: '',
-    papHpvStatus: 'UP_TO_DATE_NORMAL',
+    papHpvStatus: 'NOT_PERFORMED',
     lastPapDate: '',
-    cbcStatus: 'NORMAL',
+    cbcStatus: 'NOT_TESTED',
     hemoglobinValue: undefined,
     ferritinValue: undefined,
-    glucoseLipidsStatus: 'NORMAL',
-    lftStatus: 'NORMAL',
+    glucoseLipidsStatus: 'NOT_TESTED',
+    lftStatus: 'NOT_TESTED',
     dxaStatus: 'NOT_PERFORMED',
-    fitColorectalStatus: 'UP_TO_DATE_NORMAL',
+    fitColorectalStatus: 'NOT_PERFORMED',
     fshLevel: undefined,
     estradiolSerumLevel: undefined,
-    screeningLabsNotes: ''
+    screeningLabsNotes: '',
+
+    stage1PatientInstructionsFreeText: ''
   };
 }
 
@@ -256,12 +259,19 @@ export function createDefaultDemoStage1Data(): Stage1Data {
     bmi: 27.5,
     bpSystolic: 128,
     bpDiastolic: 82,
+    nutritionQuality: 'HEALTHY',
     exerciseRegular: true,
     gravida: 3,
     para: 3,
+    menarcheAge: 13,
     lastPeriodDate: '2026-06-15',
     cyclePattern: 'SKIPPED_OVER_60_DAYS',
+    bleedingIntensity: 'NORMAL',
     monthsSinceLastPeriod: 5,
+    contraception: {
+      ...base.contraception,
+      sexuallyActiveWithPregnancyRisk: true
+    },
     symptoms,
     medicalHistory: {
       ...base.medicalHistory,
@@ -289,22 +299,29 @@ export function createDefaultDemoStage1Data(): Stage1Data {
     lastMammographyDate: '2026-03-10',
     papHpvStatus: 'UP_TO_DATE_NORMAL',
     lastPapDate: '2025-05-12',
+    cbcStatus: 'NORMAL',
+    glucoseLipidsStatus: 'NORMAL',
+    lftStatus: 'NORMAL',
+    fitColorectalStatus: 'UP_TO_DATE_NORMAL',
     dxaStatus: 'OSTEOPENIA'
   };
 }
 
 export function createInitialRecord(blank = false): PatientRecord {
   return {
-    version: '2.0.0',
+    version: '2.1.0',
+    recordSessionId: `session_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     lastUpdated: new Date().toISOString(),
     activeStage: 1,
     stage1: blank ? createBlankStage1Data() : createDefaultDemoStage1Data(),
+    stage2: undefined,
+    selectedPlan: undefined,
     stage2Notes: [],
     stage3Visits: []
   };
 }
 
-// נרמול ושדרוג אוטומטי מתיקים ישנים ב-localStorage או קובצי JSON/QR מ-v1.0
+// נרמול ושדרוג אוטומטי מתיקים ישנים ב-localStorage או קובצי JSON/QR
 export function normalizePatientRecord(raw: any): PatientRecord {
   if (!raw || typeof raw !== 'object') {
     return createInitialRecord(false);
@@ -313,7 +330,6 @@ export function normalizePatientRecord(raw: any): PatientRecord {
   const blankS1 = createBlankStage1Data();
   const s1Raw = raw.stage1 || {};
 
-  // שדרוג תסמינים אם הגיעו מפורמט v1.0 ישן
   const mergedSymptoms = createEmptySymptomsMap();
   if (s1Raw.symptoms && typeof s1Raw.symptoms === 'object') {
     for (const key of Object.keys(mergedSymptoms)) {
@@ -324,80 +340,21 @@ export function normalizePatientRecord(raw: any): PatientRecord {
         };
       }
     }
-  } else {
-    if (s1Raw.vmsSeverity === 'SEVERE') {
-      mergedSymptoms['1'] = { severity: 4, frequency: 4, importance: 4 };
-    } else if (s1Raw.vmsSeverity === 'MODERATE') {
-      mergedSymptoms['1'] = { severity: 2, frequency: 2, importance: 3 };
-    } else if (s1Raw.vmsSeverity === 'MILD') {
-      mergedSymptoms['1'] = { severity: 1, frequency: 1, importance: 2 };
-    }
-    if (s1Raw.sleepDisruption && s1Raw.sleepDisruption !== 'NONE') {
-      mergedSymptoms['7'] = { severity: 3, importance: 3 };
-    }
-    if (s1Raw.hasVaginalDryness || s1Raw.hasDyspareunia) {
-      mergedSymptoms['15'] = { severity: 2, importance: 3 };
-    }
-    if (s1Raw.hasBrainFog) {
-      mergedSymptoms['6'] = { severity: 2, importance: 3 };
-    }
   }
 
   const medicalHistory: MedicalHistoryHierarchical = {
     ...blankS1.medicalHistory,
     ...(s1Raw.medicalHistory || {})
   };
-  // תאימות לאחור משדות שטוחים של v1.0
-  if (s1Raw.historyOfBreastCancer) {
-    medicalHistory.hasMalignancyOrBreastHistory = true;
-    medicalHistory.breastCancerHistory = true;
-  }
-  if (s1Raw.uninvestigatedBleeding) {
-    medicalHistory.hasGynecologicalOrObstetricHistory = true;
-    medicalHistory.uninvestigatedAbnormalBleeding = true;
-  }
-  if (s1Raw.activeVteOrThrombophilia) {
-    medicalHistory.hasCoagulationOrVteHistory = true;
-    medicalHistory.knownThrombophilia = true;
-  }
-  if (s1Raw.activeLiverDisease) {
-    medicalHistory.hasHepaticRenalGiHistory = true;
-    medicalHistory.activeLiverDiseaseOrPorphyria = true;
-  }
-  if (s1Raw.recentArterialEvent) {
-    medicalHistory.hasCardiovascularOrMetabolicHistory = true;
-    medicalHistory.activeOrRecentArterialEvent = true;
-  }
 
   const medications: MedicationHistoryHierarchical = {
     ...blankS1.medications,
     ...(s1Raw.medications || {})
   };
-  if (s1Raw.takingGlp1) {
-    medications.hasGlp1OrMetabolicMeds = true;
-    medications.takingGlp1 = true;
-  }
-  if (s1Raw.takingEnzymeInducers) {
-    medications.hasNeuroAntiepilepticMeds = true;
-    medications.takingEnzymeInducers = true;
-  }
-  if (s1Raw.takingTamoxifenOrAIs) {
-    medications.hasOncologicEndocrineMeds = true;
-    medications.takingTamoxifen = true;
-  }
-  if (s1Raw.takingLevothyroxine) {
-    medications.hasThyroidOrSteroidMeds = true;
-    medications.takingLevothyroxine = true;
-  }
 
   const familyHistory: FamilyHistoryData = {
     ...blankS1.familyHistory,
-    ...(s1Raw.familyHistory || {}),
-    ...(s1Raw.brcaStatus && !s1Raw.familyHistory ? { brcaStatus: s1Raw.brcaStatus } : {}),
-    ...(s1Raw.lynchSyndrome && !s1Raw.familyHistory ? { lynchSyndrome: true } : {}),
-    ...(s1Raw.familyVte && !s1Raw.familyHistory ? { familyVteOrThrombophilia: true } : {}),
-    ...(s1Raw.familyCvd && !s1Raw.familyHistory ? { familyPrematureCvd: true } : {}),
-    ...(s1Raw.familyOsteoporosis && !s1Raw.familyHistory ? { familyOsteoporosisOrHipFracture: true } : {})
+    ...(s1Raw.familyHistory || {})
   };
 
   const validEthnicities = ['ASHKENAZI', 'SEPHARDIC_MIZRAHI', 'ETHIOPIAN', 'ARAB', 'MIXED_ASHKENAZI', 'OTHER'];
@@ -429,16 +386,39 @@ export function normalizePatientRecord(raw: any): PatientRecord {
       priorFailedTreatments: Array.isArray(s1Raw.preferences?.priorFailedTreatments)
         ? s1Raw.preferences.priorFailedTreatments
         : []
-    }
+    },
+    stage1PatientInstructionsFreeText: s1Raw.stage1PatientInstructionsFreeText || ''
   };
 
+  let normalizedSelectedPlan = raw.selectedPlan;
+  if (normalizedSelectedPlan && typeof normalizedSelectedPlan === 'object') {
+    const gsmIds = Array.isArray(normalizedSelectedPlan.selectedGsmOptionIds)
+      ? normalizedSelectedPlan.selectedGsmOptionIds
+      : normalizedSelectedPlan.selectedGsmOptionId
+      ? [normalizedSelectedPlan.selectedGsmOptionId]
+      : [];
+    normalizedSelectedPlan = {
+      selectedPrimaryOptionId: normalizedSelectedPlan.selectedPrimaryOptionId || '',
+      selectedGsmOptionIds: gsmIds,
+      includeTestosterone: Boolean(normalizedSelectedPlan.includeTestosterone),
+      selectionRationaleTags: Array.isArray(normalizedSelectedPlan.selectionRationaleTags)
+        ? normalizedSelectedPlan.selectionRationaleTags
+        : [],
+      selectionRationaleFreeText: normalizedSelectedPlan.selectionRationaleFreeText || '',
+      stage2PatientInstructionsFreeText: normalizedSelectedPlan.stage2PatientInstructionsFreeText || '',
+      selectedAtIso: normalizedSelectedPlan.selectedAtIso || new Date().toISOString(),
+      customRegimenOverrideText: normalizedSelectedPlan.customRegimenOverrideText
+    };
+  }
+
   return {
-    version: '2.0.0',
+    version: '2.1.0',
+    recordSessionId: raw.recordSessionId || `session_${Date.now()}`,
     lastUpdated: raw.lastUpdated || new Date().toISOString(),
     activeStage: raw.activeStage === 2 || raw.activeStage === 3 ? raw.activeStage : 1,
     stage1,
-    stage2: raw.stage2?.rankedOptions ? raw.stage2 : undefined,
-    selectedPlan: raw.selectedPlan,
+    stage2: raw.stage2?.localGsmOptions ? raw.stage2 : undefined,
+    selectedPlan: normalizedSelectedPlan,
     stage2Notes: Array.isArray(raw.stage2Notes) ? raw.stage2Notes : [],
     stage3Visits: Array.isArray(raw.stage3Visits)
       ? raw.stage3Visits.map((v: any) => ({
@@ -468,26 +448,25 @@ export function normalizePatientRecord(raw: any): PatientRecord {
           hasRecentDoseChangeIn3Months: Boolean(v.hasRecentDoseChangeIn3Months),
           tvsThicknessMm: v.tvsThicknessMm,
           stoppedHrt4WeeksAgoAndResolved: v.stoppedHrt4WeeksAgoAndResolved,
+          bmsEndometrialOverrides: v.bmsEndometrialOverrides,
           urgentTvsIndicated: Boolean(v.urgentTvsIndicated),
           biopsyIndicated: v.biopsyIndicated,
           tvsReason: v.tvsReason,
           sideEffectActionPlan: Array.isArray(v.sideEffectActionPlan) ? v.sideEffectActionPlan : [],
           medicationAction: v.medicationAction || 'CONTINUE_SAME',
+          selectedFollowUpOptionId: v.selectedFollowUpOptionId,
           switchedToOptionId: v.switchedToOptionId,
+          selectedGsmOptionIds: Array.isArray(v.selectedGsmOptionIds) ? v.selectedGsmOptionIds : [],
+          includeTestosterone: Boolean(v.includeTestosterone),
+          selectionRationaleTags: Array.isArray(v.selectionRationaleTags) ? v.selectionRationaleTags : [],
+          selectionRationaleFreeText: v.selectionRationaleFreeText || '',
           updatedRegimenText: v.updatedRegimenText || '',
           cessationPlan: v.cessationPlan,
-          timestampedNotes: Array.isArray(v.timestampedNotes)
-            ? v.timestampedNotes
-            : v.physicianNotes
-            ? [
-                {
-                  id: `legacy_${Date.now()}`,
-                  createdAtIso: v.visitDate || new Date().toISOString(),
-                  stage: 3,
-                  text: String(v.physicianNotes)
-                }
-              ]
-            : []
+          patientFollowUpInstructions: Array.isArray(v.patientFollowUpInstructions)
+            ? v.patientFollowUpInstructions
+            : [],
+          patientFollowUpInstructionsFreeText: v.patientFollowUpInstructionsFreeText || '',
+          timestampedNotes: Array.isArray(v.timestampedNotes) ? v.timestampedNotes : []
         }))
       : []
   };

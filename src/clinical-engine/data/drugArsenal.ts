@@ -1,3 +1,8 @@
+import { evaluateCompletenessGate } from '../completenessGate';
+import { checkDrugInteractions } from '../drugInteractions';
+import { calculateAhaPreventRisk, calculateVteRisk } from '../riskCalculators';
+import { Stage1Data } from '../types';
+
 export interface IsraeliDrugItem {
   id: string;
   brandName: string;
@@ -9,7 +14,8 @@ export interface IsraeliDrugItem {
     | 'COMBINED_TRANSDERMAL'
     | 'COMBINED_ORAL'
     | 'TSEC_TIBOLONE'
-    | 'LOCAL_GSM'
+    | 'LOCAL_GSM_NON_HORMONAL'
+    | 'LOCAL_GSM_HORMONAL'
     | 'TESTOSTERONE_HSDD'
     | 'NON_HORMONAL_VMS';
   activeIngredients: string;
@@ -131,7 +137,7 @@ export const ISRAELI_DRUG_ARSENAL: IsraeliDrugItem[] = [
     clinicalAdvantages:
       'פתרון אידיאלי בפרי-מנופאוזה: מספק בו-זמנית אמצעי מניעה יעיל, שליטה בדימומים כבדים (HMB), והגנת רירית מעולה שאינה תלויה בהיענות יומית, ב-GLP-1 או באנזימי כבד!',
     cautionsAndContraindications:
-      'לפי Red Whale / מחקרי תצפית קיימת ספיגה סיסטמית קלה עם עלייה קטנה בסיכון לסרטן שד בדומה לפרוגסטינים פומיים. Kyleena/Jaydess אינם מאושרים להגנת רירית ב-MHT!'
+      'לפי Red Whale קיימת ספיגה סיסטמית קלה עם עלייה קטנה בסיכון לסרטן שד בדומה לפרוגסטינים פומיים. Kyleena/Jaydess אינם מאושרים להגנת רירית ב-MHT!'
   },
 
   // --- תכשירים משולבים קבועים (מדבקות וטבליות) ---
@@ -184,31 +190,31 @@ export const ISRAELI_DRUG_ARSENAL: IsraeliDrugItem[] = [
       'אסור באי-ספיקת כליות / כליה בודדת / אי-ספיקת אדרנל! זהירות ומעקב אשלגן וקריאטינין בשילוב ACEi / ARB / ספירונולקטון.'
   },
   {
-    id: 'progyluton',
-    brandName: 'Progyluton',
-    hebrewName: 'פרוגילוטון (ציקלי דו-שלבי 21 טבליות)',
-    category: 'COMBINED_ORAL',
-    activeIngredients: 'Estradiol Valerate 2mg + Norgestrel 0.5mg',
-    route: 'ORAL',
-    dosingSchedule: '21 טבליות (11 לבנות + 10 חומות) ו-7 ימי הפסקה עם דמם גמילה סדיר (אינו אמצעי מניעה!).',
-    clinicalAdvantages: 'הסדרת מחזור צפויה בנשים צעירות עם POI או אוליגומנוריאה המעוניינות בווסת חודשית סדירה.',
-    cautionsAndContraindications: 'אינו מונע הריון! ב-7 ימי ההפסקה יתכנו גלי חום חוזרים.'
-  },
-  {
-    id: 'duavive_livial',
-    brandName: 'Duavive (TSEC) / Livial (Tibolone 2.5mg)',
-    hebrewName: 'דואביב (ללא פרוגסטוגן!) / ליביאל (טיבולון)',
+    id: 'duavive',
+    brandName: 'Duavive (TSEC)',
+    hebrewName: 'דואביב (ללא פרוגסטוגן – TSEC)',
     category: 'TSEC_TIBOLONE',
-    activeIngredients: 'Duavive: CE 0.45mg + Bazedoxifene 20mg | Livial: Tibolone 2.5mg',
+    activeIngredients: 'Conjugated Estrogens 0.45mg + Bazedoxifene 20mg',
     route: 'ORAL',
     dosingSchedule: 'טבליה אחת ביום בפוסט-מנופאוזה (>12 חודשים מהווסת האחרונה).',
     clinicalAdvantages:
-      'Duavive: פתרון ייחודי לאישה עם רחם שמור ואי-סבילות קשה לכל הפרוגסטוגנים (בזדוקסיפן מגן על הרירית והשד!). Livial: משפר גלי חום, צפיפות עצם וחשק מיני (פעילות אנדרוגנית קלה).',
+      'פתרון ייחודי לאישה עם רחם שמור ואי-סבילות קשה לכל הפרוגסטוגנים או רגישות שד – בזדוקסיפן מגן על הרירית והשד!',
+    cautionsAndContraindications: 'מתן פומי (SERM + אסטרוגן) – אסור בסיכון VTE מוגבר.'
+  },
+  {
+    id: 'livial',
+    brandName: 'Livial (Tibolone 2.5mg)',
+    hebrewName: 'ליביאל (טיבולון 2.5 מ"ג)',
+    category: 'TSEC_TIBOLONE',
+    activeIngredients: 'Tibolone 2.5mg (STEAR)',
+    route: 'ORAL',
+    dosingSchedule: 'טבליה אחת ביום בפוסט-מנופאוזה (>12 חודשים מהווסת האחרונה).',
+    clinicalAdvantages: 'משפר גלי חום, צפיפות עצם וחשק מיני הודות לפעילות אנדרוגנית קלה ללא דימום.',
     cautionsAndContraindications:
-      'מתן פומי: להימנע בסיכון VTE. ב-Livial אין להתחיל מעל גיל 60 (עלייה בסיכון לשבץ מוחי) ואסור לאחר סרטן שד.'
+      'אין להתחיל מעל גיל 60 (עלייה בסיכון לשבץ מוחי), אסור בסיכון VTE ואסור לאחר סרטן שד!'
   },
 
-  // --- טיפולים לא-הורמונליים סיסטמיים לגלי חום והפרעות שינה ---
+  // --- טיפולים לא-הורמונליים סיסטמיים ---
   {
     id: 'veoza',
     brandName: 'Veoza 45mg (Fezolinetant)',
@@ -220,7 +226,7 @@ export const ISRAELI_DRUG_ARSENAL: IsraeliDrugItem[] = [
     clinicalAdvantages:
       'תרופה לא-הורמונלית ייעודית הפועלת ישירות על מרכז ויסות החום בהיפותלמוס (נוירוני KNDy) עם הפחתה מהירה ומרשימה בגלי חום כבר מהשבוע הראשון!',
     cautionsAndContraindications:
-      'אזהרת כבד מעודכנת (EMA / משרד הבריאות 2025): חובה בדיקת ALT, AST ובילירובין לפני התחלה (אין להתחיל אם ALT/AST ≥ 2x ULN או בילירובין מוגבר!), ולאחר מכן מעקב חודשי ב-3 החודשים הראשונים (חודש 1, 2, 3) ובהמשך בחודשים 6 ו-9! להפסיק מיד בצהבת/שתן כהה/עלייה >3x ULN. אסור עם מעכבי CYP1A2 חזקים (כגון Fluvoxamine).'
+      'אזהרת כבד מעודכנת (EMA / משרד הבריאות 2025): חובה בדיקת ALT, AST ובילירובין לפני התחלה (אין להתחיל אם ALT/AST ≥ 2x ULN או בילירובין מוגבר!), ומעקב בחודשים 1, 2, 3, 6 ו-9!'
   },
   {
     id: 'lynkuet',
@@ -229,11 +235,11 @@ export const ISRAELI_DRUG_ARSENAL: IsraeliDrugItem[] = [
     category: 'NON_HORMONAL_VMS',
     activeIngredients: 'Elinzanetant 120mg (2 x 60mg soft capsules – Dual NK1/NK3 Antagonist)',
     route: 'ORAL',
-    dosingSchedule: '2 כמוסות של 60 מ"ג (120 מ"ג) פעם ביום לפני השינה (אושר FDA אוקטובר 2025 – מחקרי OASIS).',
+    dosingSchedule: '2 כמוסות של 60 מ"ג (120 מ"ג) פעם ביום לפני השינה (אושר גם תחת טיפול אנדוקריני בסרטן שד – OASIS-4).',
     clinicalAdvantages:
-      'חסימה כפולה של NK3 (גלי חום) ו-NK1 (שינה): מפחית משמעותית גלי חום ומשפר איכות שינה ללא כל פעילות הורמונלית.',
+      'חסימה כפולה של NK3 (גלי חום) ו-NK1 (שינה): מפחית משמעותית גלי חום ומשפר איכות שינה ללא פעילות הורמונלית.',
     cautionsAndContraindications:
-      'בדיקת תפקודי כבד בביקור הבסיס וכעבור 3 חודשים; עלול לגרום לישנוניות קלה (לכן ניטל בערב); אינטראקציות CYP3A4 (להימנע מאשכוליות וממעכבי/משרני CYP3A4 חזקים).'
+      'בדיקת תפקודי כבד בביקור הבסיס וכעבור 3 חודשים; אינטראקציות CYP3A4.'
   },
   {
     id: 'venlafaxine_escitalopram',
@@ -242,11 +248,11 @@ export const ISRAELI_DRUG_ARSENAL: IsraeliDrugItem[] = [
     category: 'NON_HORMONAL_VMS',
     activeIngredients: 'Venlafaxine XR 37.5–75mg OR Escitalopram 10–20mg / Citalopram 10–20mg',
     route: 'ORAL',
-    dosingSchedule: 'פעם ביום במינון נמוך (נמוך ממינון נוגד דיכאון מלא; השפעה על VMS תוך 2–4 שבועות).',
+    dosingSchedule: 'פעם ביום במינון נמוך (השפעה על VMS תוך 2–4 שבועות).',
     clinicalAdvantages:
       'קו ראשון מוכח ובטוח במטופלות סרטן שד הנוטלות טמוקסיפן (אינם מעכבים CYP2D6!), ומשפרים במקביל חרדה ותנודות מצב רוח.',
     cautionsAndContraindications:
-      'אזהרה קריטית: תחת טמוקסיפן חל איסור מוחלט לרשום Paroxetine (פאקסט) או Fluoxetine (פרוזק)! בוונלפקסין יש לעקוב אחר ל"ד ולהפסיק בהדרגה.'
+      'תחת טמוקסיפן חל איסור מוחלט לרשום Paroxetine או Fluoxetine! בוונלפקסין לעקוב אחר ל"ד.'
   },
   {
     id: 'gabapentin_oxybutynin',
@@ -255,64 +261,194 @@ export const ISRAELI_DRUG_ARSENAL: IsraeliDrugItem[] = [
     category: 'NON_HORMONAL_VMS',
     activeIngredients: 'Gabapentin 300–900mg nocte OR Oxybutynin 2.5–5mg',
     route: 'ORAL',
-    dosingSchedule: 'גאבאפנטין לפני השינה בטיטרציה הדרגתית; אוקסיבוטינין 2.5–5 מ"ג פעמיים ביום או XR.',
+    dosingSchedule: 'גאבאפנטין לפני השינה בטיטרציה הדרגתית; אוקסיבוטינין 2.5–5 מ"ג.',
     clinicalAdvantages:
-      'גאבאפנטין מצוין להזעות לילה קשות, הפרעות שינה וכאב נוירופתי (בטוח בטמוקסיפן); אוקסיבוטינין יעיל מאוד להזעת יתר ולדחיפות במתן שתן (OAB).',
+      'גאבאפנטין מצוין להזעות לילה קשות והפרעות שינה (בטוח בטמוקסיפן); אוקסיבוטינין יעיל להזעת יתר ולדחיפות במתן שתן.',
     cautionsAndContraindications:
-      'גאבאפנטין: סחרחורת/נמנום ובצקות; אוקסיבוטינין: יובש בפה, עצירות ולהימנע בגיל מבוגר עקב עומס אנטי-כולינרגי קוגניטיבי.'
+      'גאבאפנטין: סחרחורת/נמנום; אוקסיבוטינין: יובש בפה ולהימנע מעל גיל 65 (עומס אנטי-כולינרגי).'
   },
   {
     id: 'cbt_hypnosis',
     brandName: 'CBT (MENOS Protocol) & Clinical Hypnosis',
     hebrewName: 'טיפול קוגניטיבי-התנהגותי ייעודי (CBT-MENOS) והיפנוזה קלינית',
     category: 'NON_HORMONAL_VMS',
-    activeIngredients: 'פרוטוקול מובנה בן 4–6 מפגשים + התאמות אורח חיים (קירור שכבות, הפחתת אלכוהול/קפאין, אימוני התנגדות)',
+    activeIngredients: 'פרוטוקול מובנה בן 4–6 מפגשים + התאמות אורח חיים',
     route: 'BEHAVIORAL',
     dosingSchedule: 'תוכנית בת 4–6 שבועות (פרונטלית או עצמית מודרכת).',
-    clinicalAdvantages:
-      'מומלץ בדרגת הוכחה גבוהה (NAMS / BMS) להפחתת מידת ההפרעה התפקודית של גלי החום, שיפור שינה וחרדה – אפס תופעות לוואי תרופתיות.',
-    cautionsAndContraindications: 'ללא התוויות נגד; ניתן לשלב עם כל טיפול תרופתי או לבד.'
+    clinicalAdvantages: 'מפחית ב-50% את מידת ההפרעה התפקודית של גלי החום ומשפר שינה – אפס תופעות לוואי.',
+    cautionsAndContraindications: 'ללא התוויות נגד; ניתן לשלב עם כל טיפול תרופתי.'
   },
 
-  // --- תכשירים מקומיים לתסמונת אורו-גניטלית (GSM) ומיניות (HSDD) ---
+  // --- תכשירים מקומיים מופרדים ל-GSM (לחות בנפרד מאינטררוזה, אסטרוגן נרתיקי ואוספמיפן) ---
+  {
+    id: 'vaginal_moisturizers',
+    brandName: 'Replens / Gynomunal / Hyaluronic Acid + Lubricants',
+    hebrewName: 'תכשירי לחות נרתיקיים וחומצה היאלורונית + חומרי סיכה',
+    category: 'LOCAL_GSM_NON_HORMONAL',
+    activeIngredients: 'Polycarbophil / Hyaluronic Acid vaginal moisturizers + Water/Silicone/Oil lubricants',
+    route: 'VAGINAL',
+    dosingSchedule: 'תכשיר לחות 2–3 פעמים בשבוע בקביעות + חומר סיכה בכל מגע מיני.',
+    clinicalAdvantages:
+      '100% לא-הורמונלי, בטוח לחלוטין בכל מצב (לרבות סרטן שד ומעכבי ארומטאז), וניתן לשילוב חופשי עם אסטרוגן נרתיקי או אינטררוזה!',
+    cautionsAndContraindications: 'להעדיף מוצרים איזואוסמולריים ב-pH נרתיקי חומצי ללא פראבנים/גליצרין מגרה.'
+  },
   {
     id: 'vagifem_ovestin_imvaggis',
     brandName: 'Vagifem 10mcg / Ovestin / Imvaggis 0.03mg',
     hebrewName: 'אסטרוגן נרתיקי מקומי (וגיפם / אובסטין / אימווגיס)',
-    category: 'LOCAL_GSM',
-    activeIngredients: 'Estradiol 10mcg (Vagifem) OR Estriol 0.5mg–1mg (Ovestin) OR Ultra-low Estriol 0.03mg (Imvaggis)',
+    category: 'LOCAL_GSM_HORMONAL',
+    activeIngredients: 'Estradiol 10mcg (Vagifem) | Estriol 0.5–1mg (Ovestin) | Ultra-low Estriol 0.03mg (Imvaggis)',
     route: 'VAGINAL',
-    dosingSchedule: 'מנת העמסה יומית למשך שבועיים, ולאחר מכן פעמיים בשבוע בקביעות לאורך שנים (בהפסקת הטיפול התסמינים חוזרים!).',
+    dosingSchedule: 'פעם ביום לשבועיים (העמסה), ולאחר מכן פעמיים בשבוע בקביעות לאורך שנים.',
     clinicalAdvantages:
-      'יעילות מקומית גבוהה מאוד ליובש, דיספראוניה ודלקות שתן חוזרות (מונע UTIs!), ספיגה סיסטמית זניחה וללא צורך בשום פרוגסטוגן או מעקב רירית! Imvaggis 0.03mg במינון אולטרה-נמוך מועדף כשנדרשת חשיפה מינימלית.',
+      'יעילות מקומית מצוינת ליובש, דיספראוניה ומניעת דלקות שתן חוזרות; ספיגה סיסטמית זניחה וללא צורך בפרוגסטוגן!',
     cautionsAndContraindications:
-      'בטוח בכל גיל וגם בסיכון VTE/קרדיו-וסקולרי; תחת מעכבי ארומטאז בסרטן שד – להעדיף תכשירי לחות תחילה ולהיוועץ באונקולוג.'
+      'תחת מעכבי ארומטאז בסרטן שד – קו ראשון לחות לא-הורמונלית, ואם נכשל נדרש תיאום מתועד עם האונקולוג/ית.'
   },
   {
-    id: 'intrarosa_ospemifene_moisturizers',
-    brandName: 'Intrarosa (Prasterone 6.5mg) / Ospemifene / Moisturizers',
-    hebrewName: 'אינטררוזה (DHEA נרתיקי) / אוספמיפן / תכשירי לחות נרתיקיים',
-    category: 'LOCAL_GSM',
-    activeIngredients: 'Prasterone 6.5mg pessary nightly | Ospemifene 60mg PO | Hyaluronic acid / Polycarbophil moisturizers',
+    id: 'intrarosa',
+    brandName: 'Intrarosa 6.5mg (Prasterone / DHEA)',
+    hebrewName: 'אינטררוזה (פראסטרון / DHEA נרתיקי 6.5 מ"ג)',
+    category: 'LOCAL_GSM_HORMONAL',
+    activeIngredients: 'Prasterone (DHEA) 6.5mg vaginal pessary',
     route: 'VAGINAL',
-    dosingSchedule:
-      'אינטררוזה: פתילה נרתיקית אחת כל לילה; תכשירי לחות (Replens / Gynomunal): 2–3 פעמים בשבוע + חומר סיכה בעת מגע מיני.',
+    dosingSchedule: 'פתילה נרתיקית אחת פעם ביום לפני השינה (בפוסט-מנופאוזה).',
     clinicalAdvantages:
-      'אינטררוזה מומרת תוך-תאית (Intracrinology) לאסטרוגן ואנדרוגן מקומיים ומשפרת כאב ביחסים וחשק מקומי ללא עלייה ברמות הדם; תכשירי לחות בטוחים ב-100% גם בסרטן שד פעיל.',
-    cautionsAndContraindications: 'אוספמיפן (SERM פומי) אסור בפעילות פקקתית חריפה.'
+      'מומר תוך-תאית (Intracrinology) לאסטרוגן ואנדרוגן ברקמת הנרתיק בלבד ללא עלייה ברמות ההורמונים בדם – משפר יובש וכאב ביחסים.',
+    cautionsAndContraindications: 'אינו מיועד לנשים עם היסטוריה של סרטן שד; מיועד לפוסט-מנופאוזה.'
   },
+  {
+    id: 'ospemifene',
+    brandName: 'Senshio (Ospemifene 60mg)',
+    hebrewName: 'אוספמיפן פומי ל-GSM (סנשיו 60 מ"ג)',
+    category: 'LOCAL_GSM_HORMONAL',
+    activeIngredients: 'Ospemifene 60mg oral tablet (SERM)',
+    route: 'ORAL',
+    dosingSchedule: 'טבליה אחת של 60 מ"ג פעם ביום עם האוכל (בפוסט-מנופאוזה).',
+    clinicalAdvantages: 'אפשרות פומית ייעודית ל-GSM לנשים המתקשות או אינן מעוניינות במתן נרתיקי מקומי.',
+    cautionsAndContraindications: 'SERM פומי – אסור בסיכון VTE מוגבר ואסור בסרטן שד פעיל/חשוד.'
+  },
+
+  // --- טיפול נפרד ב-HSDD (טסטוסטרון עורי נשי) ---
   {
     id: 'testosterone_hsdd',
     brandName: 'Transdermal Testosterone (Female Dose)',
     hebrewName: 'טסטוסטרון עורי במינון נשי פיזיולוגי (ל-HSDD)',
     category: 'TESTOSTERONE_HSDD',
-    activeIngredients: 'Testosterone Gel 1% (למשל AndroGel במינון נשי Off-label – כ-1/10 ממנת גבר = ~5 מ"ג/יום)',
+    activeIngredients: 'Testosterone Gel 1% (~5 מ"ג/יום – כ-1/10 ממנת גבר)',
     route: 'TRANSDERMAL_GEL',
     dosingSchedule:
-      'טיפה בגודל אפונה על הירך החיצונית/שוק תחתונה (שקית 50 מ"ג מספיקה לכ-8–10 ימים!), לרוב רק לאחר תיקון אסטרוגן סיסטמי/נרתיקי.',
+      'טיפה בגודל אפונה על הירך החיצונית/שוק תחתונה (שקית 50 מ"ג מספיקה ל-8–10 ימים), לאחר איזון אסטרוגן עורי וטיפול ב-GSM.',
     clinicalAdvantages:
-      'ההתוויה המבוססת היחידה (Global Consensus / BMS): הפרעת חשק מיני ירוד הגורמת מצוקה (HSDD) בפוסט-מנופאוזה או לאחר BSO/RRSO.',
+      'ההתוויה המבוססת היחידה: הפרעת חשק מיני ירוד הגורמת מצוקה (HSDD) בפוסט-מנופאוזה או לאחר BSO/RRSO.',
     cautionsAndContraindications:
-      'חובה לבדוק Total Testosterone (ו-SHBG/FAI) לפני ההתחלה, כעבור 3–6 שבועות וכעבור 6–12 חודשים כדי לוודא שהרמה נשארת בטווח הפיזיולוגי הנשי ולמנוע אקנה/שיעור יתר/העמקת קול. ניסיון טיפולי ל-3–6 חודשים.'
+      'בדיקת Total Testosterone בבסיס, כעבור 3–6 שבועות וכל 6–12 חודשים לשמירה בטווח הפיזיולוגי הנשי.'
   }
 ];
+
+// סינון קשיח של פורמולריום התרופות כך שיוצגו אך ורק תכשירים מתאימים שלא נפסלו עבור המטופלת!
+export function getEligibleArsenalForPatient(data: Stage1Data): IsraeliDrugItem[] {
+  const gate = evaluateCompletenessGate(data);
+  const vte = calculateVteRisk(data);
+  const prevent = calculateAhaPreventRisk(data);
+  const interactions = checkDrugInteractions(data);
+
+  const mhtBlocked = gate.systemicMhtContraindicated || prevent.mhtTrafficLight === 'RED';
+  const mandatoryTransdermal =
+    vte.mandatoryTransdermal ||
+    data.bmi >= 30 ||
+    data.medicalHistory.migraineWithAura ||
+    data.medicalHistory.hypertriglyceridemiaOver200 ||
+    data.medicalHistory.fattyLiverOrGallstones ||
+    data.medicalHistory.malabsorptionOrBariatricSurgery ||
+    interactions.some((i) => i.forcesTransdermalEstrogen) ||
+    data.age >= 60 ||
+    prevent.mhtTrafficLight === 'POST_EVENT' ||
+    data.medicalHistory.diabetesStatus === 'DIABETES' ||
+    data.medicalHistory.hypertensionStatus === 'UNCONTROLLED';
+
+  const liverBlocked = data.medicalHistory.activeLiverDiseaseOrPorphyria || data.lftStatus === 'ABNORMAL';
+  const ckdOrAceArb =
+    data.medicalHistory.chronicKidneyDiseaseOrSolitaryKidney ||
+    data.medications.takingAceArbOrPotassiumSparing;
+  const failedKeys = new Set(data.preferences.priorFailedTreatments.map((f) => f.treatmentKey));
+
+  return ISRAELI_DRUG_ARSENAL.filter((item) => {
+    // 1. אם MHT סיסטמי אסור – סנן את כל התכשירים ההורמונליים הסיסטמיים
+    if (
+      mhtBlocked &&
+      ['ESTROGEN_TRANSDERMAL', 'ESTROGEN_ORAL', 'PROGESTOGEN', 'COMBINED_TRANSDERMAL', 'COMBINED_ORAL', 'TSEC_TIBOLONE'].includes(
+        item.category
+      )
+    ) {
+      return false;
+    }
+
+    // 2. אם חובה מתן עורי – סנן כל אסטרוגן פומי ותכשירים משולבים פומיים/טיבולון/אוספמיפן
+    if (mandatoryTransdermal && ['ESTROGEN_ORAL', 'COMBINED_ORAL', 'TSEC_TIBOLONE'].includes(item.category)) {
+      return false;
+    }
+
+    // 3. אם כריתת רחם ללא אנדומטריוזיס – אין צורך להציג פרוגסטוגנים או משולבים עם פרוגסטין
+    const needsProg = !data.hadHysterectomy || data.medicalHistory.hadEndometriosis || Boolean(data.cervixConserved);
+    if (!needsProg && ['PROGESTOGEN', 'COMBINED_TRANSDERMAL', 'COMBINED_ORAL'].includes(item.category)) {
+      return false;
+    }
+
+    // 4. אלרגיה לבוטנים/סויה או כישלון אוטרוגסטן -> סנן אוטרוגסטן
+    if (item.id === 'utrogestan' && (data.medicalHistory.peanutOrSoyAllergy || failedKeys.has('UTROGESTAN_ORAL'))) {
+      return false;
+    }
+
+    // 5. רגישות לדבק מדבקות או כישלון מדבקות -> סנן מדבקות
+    if (
+      item.route === 'TRANSDERMAL_PATCH' &&
+      (data.medicalHistory.patchAdhesiveSensitivity || failedKeys.has('EVOREL_PATCH'))
+    ) {
+      return false;
+    }
+
+    // 6. כליה בודדת / CKD / ACEi-ARB -> סנן Angeliq
+    if (item.id === 'angeliq' && ckdOrAceArb) {
+      return false;
+    }
+
+    // 7. ליביאל מעל גיל 60 או פחות משנה מהווסת
+    if (item.id === 'livial' && (data.age >= 60 || data.monthsSinceLastPeriod < 12)) {
+      return false;
+    }
+
+    // 8. מחלת כבד או תפקודי כבד חריגים -> סנן ויוזה / לינקואט
+    if ((item.id === 'veoza' || item.id === 'lynkuet') && (liverBlocked || failedKeys.has('VEOZA_NK3'))) {
+      return false;
+    }
+
+    // 9. סרטן שד / מעכבי ארומטאז / טמוקסיפן -> סנן Intrarosa, Ospemifene וטסטוסטרון
+    if (
+      (data.medicalHistory.breastCancerHistory ||
+        data.medications.takingTamoxifen ||
+        data.medications.takingAromataseInhibitors) &&
+      (item.id === 'intrarosa' || item.id === 'ospemifene' || item.id === 'testosterone_hsdd')
+    ) {
+      return false;
+    }
+    if (data.medications.takingAromataseInhibitors && item.id === 'vagifem_ovestin_imvaggis') {
+      return false;
+    }
+    if ((vte.mandatoryTransdermal || data.monthsSinceLastPeriod < 12) && item.id === 'ospemifene') {
+      return false;
+    }
+    if (liverBlocked && item.id === 'testosterone_hsdd') {
+      return false;
+    }
+
+    // 10. סינון תכשירים שנוסו ונכשלו בעבר
+    if (item.id === 'femoston_family' && failedKeys.has('ORAL_FEMOSTON')) return false;
+    if (item.id === 'activelle_eviana_novofem' && failedKeys.has('ORAL_COMBINED_NETA')) return false;
+    if (item.id === 'mirena' && failedKeys.has('MIRENA_IUS')) return false;
+    if ((item.id === 'estrogel' || item.id === 'sandrena') && failedKeys.has('ESTROGEL_SANDRENA')) return false;
+    if (item.id === 'venlafaxine_escitalopram' && failedKeys.has('SSRI_SNRI')) return false;
+
+    return true;
+  });
+}

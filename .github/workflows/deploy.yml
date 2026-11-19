@@ -30,6 +30,9 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Run clinical system tests (10 scenarios & spec traceability)
+        run: npm test
+
       - name: Build web application
         run: npm run build
 

@@ -37,13 +37,12 @@ export const App: React.FC = () => {
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [printModalConfig, setPrintModalConfig] = useState<{
     isOpen: boolean;
-    type: 'PATIENT_INSTRUCTIONS' | 'PATIENT_LEAFLET' | 'EMR_SUMMARY';
+    type: 'PATIENT_INSTRUCTIONS' | 'PATIENT_LEAFLET' | 'STAGE3_FOLLOWUP' | 'EMR_SUMMARY';
   }>({
     isOpen: false,
     type: 'PATIENT_LEAFLET'
   });
 
-  // שמירה אוטומטית כטיוטה מקומית ב-LocalStorage
   useEffect(() => {
     localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(record));
   }, [record]);
@@ -53,28 +52,37 @@ export const App: React.FC = () => {
 
   // עדכון שדות שלב 1
   const handleStage1Change = (updated: Partial<Stage1Data>) => {
-    setRecord((prev) => {
-      const nextStage1 = { ...prev.stage1, ...updated };
-      return {
-        ...prev,
-        stage1: nextStage1,
-        lastUpdated: new Date().toISOString()
-      };
-    });
+    setRecord((prev) => ({
+      ...prev,
+      stage1: { ...prev.stage1, ...updated },
+      lastUpdated: new Date().toISOString()
+    }));
   };
 
-  // מעבר לשלב 2 וחישוב אופציות הטיפול המדורגות
+  // מעבר לשלב 2 וחישוב אופציות הטיפול המתאימות בלבד
   const handleProceedToStage2 = () => {
     const recs = formulateTreatment(record.stage1);
     setRecord((prev) => {
-      const defaultSelected: SelectedTreatmentPlan = prev.selectedPlan || {
-        selectedPrimaryOptionId: recs.rankedOptions[0]?.id || '',
-        selectedGsmOptionId: recs.localAndAdjunctOptions.find((l) => l.domain === 'GSM_VAGINAL' && l.recommended)?.id,
-        includeTestosterone: false,
-        selectionRationaleTags: [],
-        selectionRationaleFreeText: '',
-        selectedAtIso: new Date().toISOString()
-      };
+      const validPrimaryId =
+        prev.selectedPlan?.selectedPrimaryOptionId &&
+        recs.rankedOptions.some((o) => o.id === prev.selectedPlan?.selectedPrimaryOptionId)
+          ? prev.selectedPlan.selectedPrimaryOptionId
+          : recs.rankedOptions[0]?.id || '';
+
+      const defaultSelected: SelectedTreatmentPlan = prev.selectedPlan
+        ? {
+            ...prev.selectedPlan,
+            selectedPrimaryOptionId: validPrimaryId
+          }
+        : {
+            selectedPrimaryOptionId: validPrimaryId,
+            selectedGsmOptionIds: recs.localGsmOptions.filter((l) => l.recommended).map((l) => l.id),
+            includeTestosterone: false,
+            selectionRationaleTags: [],
+            selectionRationaleFreeText: '',
+            stage2PatientInstructionsFreeText: '',
+            selectedAtIso: new Date().toISOString()
+          };
       return {
         ...prev,
         activeStage: 2,
@@ -86,7 +94,7 @@ export const App: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // שמירת האופציה שנבחרה ומדוע בשלב 2
+  // שמירת האופציה שנבחרה, תוספות מקומיות (Multi-Select), טסטוסטרון ונימוק בשלב 2
   const handleSelectPlan = (plan: SelectedTreatmentPlan) => {
     setRecord((prev) => ({
       ...prev,
@@ -96,7 +104,6 @@ export const App: React.FC = () => {
     }));
   };
 
-  // הוספת הערה מתוארכת בשלב 2
   const handleAddStage2Note = (text: string) => {
     setRecord((prev) => ({
       ...prev,
@@ -121,14 +128,16 @@ export const App: React.FC = () => {
     }));
   };
 
-  // מעבר לשלב 3
   const handleProceedToStage3 = () => {
     setRecord((prev) => {
       const recs = formulateTreatment(prev.stage1);
       const ensuredPlan: SelectedTreatmentPlan = prev.selectedPlan || {
         selectedPrimaryOptionId: recs.rankedOptions[0]?.id || '',
+        selectedGsmOptionIds: recs.localGsmOptions.filter((l) => l.recommended).map((l) => l.id),
+        includeTestosterone: false,
         selectionRationaleTags: [],
         selectionRationaleFreeText: '',
+        stage2PatientInstructionsFreeText: '',
         selectedAtIso: new Date().toISOString()
       };
       return {
@@ -142,7 +151,6 @@ export const App: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // הוספת ביקור מעקב בשלב 3 (ועדכון התוכנית הפעילה אם בוצעה החלפת תרופה!)
   const handleAddLongitudinalVisit = (visit: LongitudinalVisit, switchedPlan?: SelectedTreatmentPlan) => {
     setRecord((prev) => ({
       ...prev,
@@ -152,7 +160,6 @@ export const App: React.FC = () => {
     }));
   };
 
-  // ייצוא קובץ מוצפן מקומית (AES-GCM 256-bit)
   const handleExportJson = async () => {
     try {
       const encryptedBase64 = await encryptData(record);
@@ -169,7 +176,6 @@ export const App: React.FC = () => {
     }
   };
 
-  // טעינת קובץ נתונים מוצפן (או JSON גלוי לגיבוי)
   const handleImportJson = async (file: File) => {
     try {
       const text = await file.text();
@@ -184,14 +190,12 @@ export const App: React.FC = () => {
         normalized.stage2 = formulateTreatment(normalized.stage1);
       }
       setRecord(normalized);
-      alert(`תיק המטופלת (${normalized.stage1.fullName || 'מטופלת'}) נטען בהצלחה!`);
     } catch (err) {
       console.error('Import failed', err);
       alert('שגיאה בפענוח הקובץ. אנא ודא/י שהקובץ תקין.');
     }
   };
 
-  // שחזור מקוד QR דחוס
   const handleRestoreFromCompressed = (data: any) => {
     const normalized = normalizePatientRecord(data);
     if (normalized.selectedPlan || normalized.activeStage >= 2) {
@@ -200,13 +204,13 @@ export const App: React.FC = () => {
     setRecord(normalized);
   };
 
-  // איפוס תיק ופתיחת מטופלת חדשה ריקה
+  // איפוס מלא של 100% מהשדות ופתיחת תיק מטופלת חדשה עם recordSessionId חדש (המרענן את כל רכיבי הממשק!)
   const handleResetPatient = () => {
-    if (confirm('האם לאפס את הנתונים ולפתוח תיק מטופלת חדשה ונקייה?')) {
-      localStorage.removeItem(DRAFT_STORAGE_KEY);
-      localStorage.removeItem('menopause_active_draft');
-      setRecord(createInitialRecord(true));
-    }
+    localStorage.removeItem(DRAFT_STORAGE_KEY);
+    localStorage.removeItem('menopause_active_draft');
+    const cleanRecord = createInitialRecord(true);
+    setRecord(cleanRecord);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return (
@@ -236,6 +240,7 @@ export const App: React.FC = () => {
       <main className="flex-1">
         {record.activeStage === 1 && (
           <Stage1View
+            key={`s1_${record.recordSessionId}`}
             data={record.stage1}
             onChange={handleStage1Change}
             onProceedToStage2={handleProceedToStage2}
@@ -247,6 +252,7 @@ export const App: React.FC = () => {
 
         {record.activeStage === 2 && (
           <Stage2View
+            key={`s2_${record.recordSessionId}`}
             record={record}
             stage1Data={record.stage1}
             selectedPlan={record.selectedPlan}
@@ -263,12 +269,16 @@ export const App: React.FC = () => {
 
         {record.activeStage === 3 && (
           <Stage3View
+            key={`s3_${record.recordSessionId}`}
             record={record}
             stage1Data={record.stage1}
             stage2Recs={record.stage2}
             selectedPlan={record.selectedPlan}
             visits={record.stage3Visits}
             onAddVisit={handleAddLongitudinalVisit}
+            onPrintFollowUpSummary={() =>
+              setPrintModalConfig({ isOpen: true, type: 'STAGE3_FOLLOWUP' })
+            }
           />
         )}
       </main>
@@ -284,7 +294,6 @@ export const App: React.FC = () => {
         </div>
       </footer>
 
-      {/* מודאלים (מודול H דינמי ומותאם לנתוני המטופלת!) */}
       <ModuleHModal
         isOpen={isModuleHOpen}
         onClose={() => setIsModuleHOpen(false)}

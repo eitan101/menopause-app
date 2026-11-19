@@ -10,12 +10,13 @@ import {
 import { evaluateContraceptionAndMirena, evaluateSTRAWStage } from './strawStaging';
 import {
   EstrogenDoseTier,
-  LocalOrAdjunctOption,
+  LocalGsmOption,
   PriorFailedTreatment,
   RegimenType,
   RoutePreference,
   Stage1Data,
   Stage2Recommendations,
+  TestosteroneHsddOption,
   TreatmentOptionCard
 } from './types';
 
@@ -27,7 +28,7 @@ function findPriorFailure(
 }
 
 function clampScore(n: number): number {
-  return Math.max(0, Math.min(99, Math.round(n)));
+  return Math.max(10, Math.min(99, Math.round(n)));
 }
 
 export function formulateTreatment(data: Stage1Data): Stage2Recommendations {
@@ -41,6 +42,8 @@ export function formulateTreatment(data: Stage1Data): Stage2Recommendations {
   const interactions = checkDrugInteractions(data);
   const sym = summarizeSymptoms(data.symptoms);
 
+  const excludedReasonsAudit: string[] = [];
+
   // 1. קביעת מדרגת מינון האסטרוגן ומינון הפרוגסטוגן הפרופורציונלי (BMS 2024 / Red Whale / Dr. Shaklai)
   let estrogenDoseTier: EstrogenDoseTier = 'STANDARD';
   let estrogenDoseTierReasonHebrew =
@@ -49,7 +52,7 @@ export function formulateTreatment(data: Stage1Data): Stage2Recommendations {
   if (
     straw.stage === 'POI' ||
     straw.stage === 'EARLY_MENOPAUSE' ||
-    (straw.stage === 'SURGICAL_MENOPAUSE' && data.age < 45)
+    (straw.stage === 'SURGICAL_MENOPAUSE' && data.age > 0 && data.age < 45)
   ) {
     estrogenDoseTier = 'MODERATE_HIGH_PHYSIOLOGIC';
     estrogenDoseTierReasonHebrew =
@@ -57,7 +60,7 @@ export function formulateTreatment(data: Stage1Data): Stage2Recommendations {
   } else if (data.age >= 60 || data.monthsSinceLastPeriod >= 120) {
     estrogenDoseTier = 'LOW';
     estrogenDoseTierReasonHebrew =
-      'גיל ≥60 או מעל 10 שנים מהווסת האחרונה: אם מותחל MHT יש לבחור מינון אסטרדיול נמוך/אולטרה-נמוך במתן עורי בלבד.';
+      'גיל ≥60 או מעל 10 שנים מהווסת האחרונה: העדפה לקו ראשון לא-הורמונלי או אסטרדיול עורי במינון נמוך/אולטרה-נמוך בלבד בהחלטה משותפת.';
   }
 
   // מינון פרוגסטוגן פרופורציונלי לפי BMS 2024
@@ -83,7 +86,7 @@ export function formulateTreatment(data: Stage1Data): Stage2Recommendations {
       ? 'מדבקת Evorel 25 (או חצי מדבקת 50) פעמיים בשבוע'
       : 'מדבקת Evorel 50 פעמיים בשבוע';
 
-  // 2. קביעת סוג המשטר הרחמי (אסטרוגן בלבד / ציקלי / רציף / לא-הורמונלי ראשי)
+  // 2. קביעת סוג המשטר הרחמי
   const needsEndometrialProtection =
     !data.hadHysterectomy || data.medicalHistory.hadEndometriosis || Boolean(data.cervixConserved);
   const isPostmenopausalOver1Year =
@@ -92,9 +95,12 @@ export function formulateTreatment(data: Stage1Data): Stage2Recommendations {
   let regimenType: RegimenType = 'CONTINUOUS_COMBINED';
   let regimenHebrewTitle = '';
 
-  if (gate.systemicMhtContraindicated) {
+  if (gate.systemicMhtContraindicated || prevent.mhtTrafficLight === 'RED') {
     regimenType = 'NON_HORMONAL_PRIMARY';
-    regimenHebrewTitle = 'מסלול לא-הורמונלי מותאם אישית + טיפול מקומי ל-GSM (עקב התווית נגד ל-MHT סיסטמי)';
+    regimenHebrewTitle =
+      gate.systemicMhtContraindicated
+        ? 'מסלול לא-הורמונלי מותאם אישית + טיפול מקומי ל-GSM (תכשירים הורמונליים סיסטמיים סוננו בשל התווית נגד)'
+        : 'מסלול לא-הורמונלי מועדף + איזון קרדיו-מטבולי (תכשירים הורמונליים סוננו בשל סיכון PREVENT גבוה)';
   } else if (!needsEndometrialProtection) {
     regimenType = 'ESTROGEN_ONLY';
     regimenHebrewTitle = 'אסטרוגן סיסטמי בלבד (לאחר כריתת רחם ללא אנדומטריוזיס שיורי – ללא צורך בפרוגסטוגן)';
@@ -106,45 +112,45 @@ export function formulateTreatment(data: Stage1Data): Stage2Recommendations {
     regimenHebrewTitle = 'משטר משולב סדרתי/ציקלי או מירנה + E2 (פחות מ-12 חודשי אל-ווסת – מניעת דימומים בלתי צפויים)';
   }
 
-  // 3. קביעת ציר המתן (עורי חובה / עורי מועדף / פומי או עורי / לא-הורמונלי)
+  // 3. קביעת ציר המתן וסינון צירים פסולים
   const routeRationale: string[] = [];
   let mandatoryTransdermal = false;
   let preferTransdermal = false;
 
   if (vte.mandatoryTransdermal) {
     mandatoryTransdermal = true;
-    routeRationale.push(`סיכון קרישתי/VTE (${vte.factors.join(', ')}) – מתן עורי עוקף יצירת פקטורי קרישה בכבד.`);
+    routeRationale.push(`סיכון קרישתי/VTE (${vte.factors.join(', ')}) – מתן פומי נפסל, מוצג מתן עורי בלבד.`);
   }
   if (data.bmi >= 30) {
     mandatoryTransdermal = true;
-    routeRationale.push(`BMI ≥ 30 (${data.bmi}) – חובה אסטרדיול עורי למניעת הכפלת סיכון פקקתי.`);
+    routeRationale.push(`BMI ≥ 30 (${data.bmi}) – מתן פומי נפסל למניעת הכפלת סיכון פקקתי.`);
   }
   if (data.medicalHistory.migraineWithAura) {
     mandatoryTransdermal = true;
-    routeRationale.push('מיגרנה עם אאורה – אסטרוגן פומי אסור; מתן עורי במינון יציב ונמוך מותר ובטוח (Red Whale / BMS).');
+    routeRationale.push('מיגרנה עם אאורה – אסטרוגן פומי נפסל; מוצגים תכשירים עוריים יציבים בלבד.');
   } else if (data.medicalHistory.migraineWithoutAura) {
     preferTransdermal = true;
-    routeRationale.push('מיגרנה ללא אאורה – מתן עורי שומר על רמות אסטרדיול יציבות ומונע התקפי מיגרנה מתנודות.');
+    routeRationale.push('מיגרנה ללא אאורה – מתן עורי מועדף לשמירה על רמות אסטרדיול יציבות.');
   }
   if (data.medicalHistory.hypertriglyceridemiaOver200) {
     mandatoryTransdermal = true;
-    routeRationale.push('היפרטריגליצרידמיה (TG ≥ 200 mg/dL) – אסטרוגן פומי עלול להקפיץ TG ולגרום לפנקראטיטיס; מתן עורי בלבד!');
+    routeRationale.push('היפרטריגליצרידמיה (TG ≥ 200 mg/dL) – מתן פומי נפסל (סכנת פנקראטיטיס); עורי בלבד.');
   }
   if (data.medicalHistory.fattyLiverOrGallstones) {
     mandatoryTransdermal = true;
-    routeRationale.push('כבד שומני (MASLD) או אבני מרה – אסטרוגן פומי מעלה רוויון כולסטרול במרה; חובה מתן עורי.');
+    routeRationale.push('כבד שומני (MASLD) או אבני מרה – אסטרוגן פומי נפסל; מתן עורי בלבד.');
   }
   if (data.medicalHistory.malabsorptionOrBariatricSurgery) {
     mandatoryTransdermal = true;
-    routeRationale.push('ניתוח בריאטרי / תת-ספיגה – מתן עורי מבטיח ספיגה יציבה שאינה תלויה במעי.');
+    routeRationale.push('ניתוח בריאטרי / תת-ספיגה – מתן פומי נפסל; מתן עורי בלבד.');
   }
   if (interactions.some((i) => i.forcesTransdermalEstrogen)) {
     mandatoryTransdermal = true;
     routeRationale.push(
-      `אינטראקציה תרופתית פעילה (${interactions
+      `אינטראקציה תרופתית (${interactions
         .filter((i) => i.forcesTransdermalEstrogen)
         .map((i) => i.drugName)
-        .join(', ')}) המחייבת מתן עורי.`
+        .join(', ')}) הפוסלת אסטרוגן פומי.`
     );
   }
   if (
@@ -155,533 +161,569 @@ export function formulateTreatment(data: Stage1Data): Stage2Recommendations {
     data.isSmoker ||
     data.age >= 60
   ) {
-    mandatoryTransdermal =
-      mandatoryTransdermal ||
+    if (
       data.age >= 60 ||
       prevent.mhtTrafficLight === 'POST_EVENT' ||
       data.medicalHistory.diabetesStatus === 'DIABETES' ||
-      data.medicalHistory.hypertensionStatus === 'UNCONTROLLED';
+      data.medicalHistory.hypertensionStatus === 'UNCONTROLLED'
+    ) {
+      mandatoryTransdermal = true;
+    }
     preferTransdermal = true;
     routeRationale.push(
-      'פרופיל קרדיו-מטבולי / גיל / עישון / PREVENT: מתן עורי של 17β-Estradiol מועדף חד-משמעית לבטיחות ווסקולרית.'
+      'פרופיל קרדיו-מטבולי / גיל / עישון / PREVENT: העדפה חד-משמעית למתן עורי של 17β-Estradiol.'
     );
   }
   if (data.medications.takingLevothyroxine) {
     preferTransdermal = true;
-    routeRationale.push('נטילת לבותירוקסין: מתן עורי אינו מעלה TBG ומונע צורך בשינוי מינון אלטרוקסין.');
+    routeRationale.push('נטילת לבותירוקסין: מתן עורי מועדף כי אינו מעלה TBG.');
   }
   if (sym.hasSignificantHsdd) {
     preferTransdermal = true;
-    routeRationale.push('ירידה בחשק המיני (HSDD): אסטרוגן עורי אינו מעלה SHBG ולכן אינו מוריד טסטוסטרון חופשי (בניגוד לפומי!).');
+    routeRationale.push('ירידה בחשק המיני (HSDD): אסטרוגן עורי אינו מעלה SHBG ואינו מפחית טסטוסטרון חופשי.');
   }
 
   let routePreference: RoutePreference = 'ORAL_OR_TRANSDERMAL';
   if (gate.systemicMhtContraindicated || prevent.mhtTrafficLight === 'RED') {
     routePreference = 'NON_HORMONAL_ONLY';
-    if (prevent.mhtTrafficLight === 'RED' && !gate.systemicMhtContraindicated) {
-      routeRationale.push(
-        `סיכון AHA PREVENT גבוה (${prevent.risk10YearTotalCvd}% ל-10 שנים): מומלץ קו ראשון לא-הורמונלי ואיזון גורמי סיכון.`
-      );
-    }
+    excludedReasonsAudit.push('כלל התכשירים ההורמונליים הסיסטמיים סוננו עקב התווית נגד או סיכון PREVENT גבוה.');
   } else if (mandatoryTransdermal) {
     routePreference = 'TRANSDERMAL_MANDATORY';
+    excludedReasonsAudit.push('תכשירי אסטרוגן פומיים סוננו אוטומטית עקב חובת מתן עורי בפרופיל המטופלת.');
   } else if (preferTransdermal) {
     routePreference = 'TRANSDERMAL_PREFERRED';
   } else {
     routeRationale.push(
-      'אישה מתחת לגיל 60 ללא גורמי סיכון פקקתיים, מטבוליים או אינטראקציות – ניתן לבחור מתן עורי (מועדף בטיחותית) או פומי לפי העדפתה.'
+      'אישה מתחת לגיל 60 ללא גורמי סיכון פקקתיים, מטבוליים או אינטראקציות – ניתן לבחור מתן עורי או פומי.'
     );
   }
 
-  const blocksUtrogestan = data.medicalHistory.peanutOrSoyAllergy;
-  const patchSensitivity = data.medicalHistory.patchAdhesiveSensitivity;
+  const utrogestanFailed = findPriorFailure(data.preferences.priorFailedTreatments, ['UTROGESTAN_ORAL']);
+  const blocksUtrogestan = data.medicalHistory.peanutOrSoyAllergy || Boolean(utrogestanFailed);
+  if (blocksUtrogestan) {
+    excludedReasonsAudit.push(
+      data.medicalHistory.peanutOrSoyAllergy
+        ? 'Utrogestan סונן עקב אלרגיה לבוטנים/סויה – הוחלף אוטומטית ב-Duphaston / מירנה.'
+        : `Utrogestan סונן עקב אי-סבילות בטיפול עבר (${utrogestanFailed?.reasonStopped}) – הוחלף ב-Duphaston / מירנה.`
+    );
+  }
+
+  const patchDisqualified =
+    data.medicalHistory.patchAdhesiveSensitivity ||
+    Boolean(findPriorFailure(data.preferences.priorFailedTreatments, ['EVOREL_PATCH']));
+  if (patchDisqualified) {
+    excludedReasonsAudit.push('מדבקות עוריות (Evorel) סוננו עקב רגישות לדבק מדבקות או כישלון טיפול קודם.');
+  }
+
+  const gelFailed = findPriorFailure(data.preferences.priorFailedTreatments, ['ESTROGEL_SANDRENA']);
+  const mirenaFailed = findPriorFailure(data.preferences.priorFailedTreatments, ['MIRENA_IUS']);
+  const oralFemostonFailed = findPriorFailure(data.preferences.priorFailedTreatments, ['ORAL_FEMOSTON']);
+  const oralNetaFailed = findPriorFailure(data.preferences.priorFailedTreatments, ['ORAL_COMBINED_NETA']);
+  const veozaFailed = findPriorFailure(data.preferences.priorFailedTreatments, ['VEOZA_NK3']);
+  const ssriFailed = findPriorFailure(data.preferences.priorFailedTreatments, ['SSRI_SNRI']);
+
   const prefersNonHormonal = data.preferences.hormoneAttitude === 'PREFERS_NON_HORMONAL';
   const prefersBodyIdentical = data.preferences.hormoneAttitude === 'PREFERS_BODY_IDENTICAL';
-  const mhtBlocked = gate.systemicMhtContraindicated;
-  const highCvRisk = prevent.mhtTrafficLight === 'RED';
+  const mhtBlocked = gate.systemicMhtContraindicated || prevent.mhtTrafficLight === 'RED';
+  const meningiomaBlocksProgestogen = data.medicalHistory.meningiomaHistory && needsEndometrialProtection;
 
-  // בניית כרטיסי אופציות הטיפול (הורמונליות + לא-הורמונליות) עם דירוג מותאם אישית, יתרונות וחסרונות
   const options: TreatmentOptionCard[] = [];
 
-  // --- אופציה הורמונלית 1: ג'ל אסטרדיול עורי + אוטרוגסטן / דופסטון (או ללא פרוגסטוגן בכריתת רחם) ---
-  {
-    const failed = findPriorFailure(data.preferences.priorFailedTreatments, ['ESTROGEL_SANDRENA', 'UTROGESTAN_ORAL']);
-    let score = mhtBlocked ? 5 : highCvRisk ? 38 : 92;
-    const matchReasons: string[] = [];
-    const pros: string[] = [
-      'פרופיל הבטיחות הגבוה ביותר (Body-Identical): אפס עלייה בסיכון ל-VTE או שבץ מוחי בעקיפת הכבד.',
-      'גמישות קלה בטיטרציית מינון יומית וללא גירוי עורי מדבק מדבקות.'
-    ];
-    const cons: string[] = [
-      'דורש מריחה יומית והמתנה של 5 דקות לייבוש (ו-60 דקות ממגע עור-בעור באזור המריחה).'
-    ];
+  // =========================================================================
+  // בניית אופציות הורמונליות סיסטמיות מתאימות בלבד (ללא הצגת תרופות שנפסלו!)
+  // =========================================================================
+  if (!mhtBlocked && !meningiomaBlocksProgestogen) {
+    // --- אופציה הורמונלית 1: ג'ל אסטרדיול עורי (Estrogel / Sandrena) ---
+    if (!gelFailed) {
+      let score = data.age >= 60 ? 74 : 93;
+      const matchReasons: string[] = [];
+      const pros: string[] = [
+        'פרופיל הבטיחות הגבוה ביותר: עוקף מעבר ראשון בכבד ולכן ללא עלייה בסיכון ל-VTE או שבץ.',
+        'גמישות קלה ומדויקת בטיטרציית מינון יומית וללא גירוי עורי מדבק מדבקות.'
+      ];
+      const cons: string[] = [
+        'דורש מריחה יומית והמתנה של 5 דקות לייבוש (ו-60 דקות ממגע עור-בעור באזור המריחה).'
+      ];
 
-    let progestogenText: string | undefined;
-    if (needsEndometrialProtection) {
-      if (blocksUtrogestan) {
-        progestogenText =
-          regimenType === 'CONTINUOUS_COMBINED'
-            ? 'Duphaston (דידרוגסטרון) 10 מ"ג ביום ברצף (נבחר במקום אוטרוגסטן בשל אלרגיה לבוטנים/סויה!)'
-            : 'Duphaston 10 מ"ג ליום למשך 14 ימים בחודש (בטוח באלרגיית בוטנים/סויה!)';
-        matchReasons.push('הותאם אוטומטית עם דופסטון במקום אוטרוגסטן עקב אלרגיה לבוטנים/סויה!');
-      } else {
-        progestogenText =
-          regimenType === 'CONTINUOUS_COMBINED' ? utrogestanContinuousDose : utrogestanSequentialDose;
-        pros.push('אוטרוגסטן בנטילת ערב תורם להירדמות ולשיפור שינה (השפעה גאבארגית טבעית) והבטוח ביותר לשד.');
-        cons.push('דורש נטילת שני תכשירים נפרדים (ג׳ל + כדור ערב – חשיבות להקפדה על הפרוגסטוגן להגנת הרירית!).');
-        if (data.medications.takingGlp1) {
-          score -= 14;
-          cons.push('תחת GLP-1 ספיגת פרוגסטוגן פומי עלולה להיפגע – שקלי מירנה או מדבקה משולבת להגנת הרירית!');
+      let progestogenText: string | undefined;
+      const patientSteps: string[] = [
+        `מרחי ${estrogelDoseText} של ג׳ל אסטרוג׳ל על עור נקי ויבש בזרוע החיצונית או בירך הפנימית (אין למרוח על השדיים!), והמתיני 5 דקות לייבוש לפני לבוש.`
+      ];
+
+      if (needsEndometrialProtection) {
+        if (blocksUtrogestan) {
+          progestogenText =
+            regimenType === 'CONTINUOUS_COMBINED'
+              ? 'Duphaston (דידרוגסטרון) 10 מ"ג טבליה ביום ברצף'
+              : 'Duphaston 10 מ"ג טבליה ביום למשך 14 ימים בכל חודש';
+          matchReasons.push('הותאם עם דופסטון (ללא אוטרוגסטן שנפסל עבור המטופלת).');
+          patientSteps.push(`הגנה על רירית הרחם: טלי ${progestogenText} בקביעות (אין להפסיק את הכדור כל עוד נמרח הג׳ל!).`);
+        } else if (data.medications.takingGlp1) {
+          // תחת GLP-1 פרוגסטוגן פומי פחות אמין – נוריד ניקוד מול מירנה/מדבקה ונוסיף הוראת 4 שבועות מפורשת
+          score -= 16;
+          progestogenText =
+            regimenType === 'CONTINUOUS_COMBINED' ? utrogestanContinuousDose : utrogestanSequentialDose;
+          cons.push('תחת זריקות GLP-1 ספיגת כדור פרוגסטרון פומי עלולה להיפגע – מומלץ להעדיף התקן מירנה או מדבקה משולבת!');
+          patientSteps.push(
+            `הגנת רירית הרחם: טלי ${progestogenText} לפני השינה על קיבה ריקה (בכל עליית מינון ב-GLP-1 יש לעדכן רופא/ה לצורך תגבור הגנה ל-4 שבועות).`
+          );
+        } else {
+          progestogenText =
+            regimenType === 'CONTINUOUS_COMBINED' ? utrogestanContinuousDose : utrogestanSequentialDose;
+          pros.push('אוטרוגסטן בנטילת ערב משפר הירדמות ושינה רציפה ובעל הפרופיל הבטוח ביותר לשד.');
+          cons.push('שני תכשירים נפרדים – חובה להקפיד על נטילת הפרוגסטרון להגנת רירית הרחם.');
+          patientSteps.push(`הגנה על רירית הרחם ושינה: טלי ${progestogenText} על קיבה ריקה סמוך לשינה.`);
         }
-      }
-    } else {
-      pros.push('לאחר כריתת רחם: אסטרוגן בלבד (ללא פרוגסטוגן) אינו מעלה סיכון לסרטן השד ואף הדגים ירידה במחקר WHI.');
-    }
-
-    if (sym.hasSignificantSleepIssue && !blocksUtrogestan && needsEndometrialProtection) {
-      score += 4;
-      matchReasons.push('מתאים במיוחד להפרעות השינה שדורגו בחשיבות גבוהה (אוטרוגסטן לפני השינה).');
-    }
-    if (patchSensitivity) {
-      score += 6;
-      matchReasons.push('מועדף על פני מדבקות עקב רגישות עורית לדבק.');
-    }
-    if (prefersBodyIdentical) {
-      score += 5;
-      matchReasons.push('תואם את העדפת המטופלת להורמונים זהים-ביולוגית (Body-Identical).');
-    }
-    if (data.preferences.preferredRoute === 'TRANSDERMAL_GEL') {
-      score += 10;
-      matchReasons.push('תואם את העדפת המטופלת לג׳ל עורי.');
-    }
-    if (prefersNonHormonal) score -= 28;
-    if (failed) {
-      score -= 26;
-      cons.push(`נוסה בעבר והופסק (${failed.reasonStopped || 'לפי דיווח המטופלת'}) – דורג נמוך יותר בהתאם.`);
-    }
-
-    options.push({
-      id: 'opt_transdermal_gel_body_identical',
-      category: 'HORMONAL_SYSTEMIC',
-      rankScore: clampScore(score),
-      suitabilityBadge: mhtBlocked
-        ? 'CONTRAINDICATED_FOR_PATIENT'
-        : highCvRisk || prefersNonHormonal
-        ? 'CONDITIONAL'
-        : score >= 85
-        ? 'RECOMMENDED_TOP'
-        : 'GOOD_ALTERNATIVE',
-      titleHebrew: needsEndometrialProtection
-        ? blocksUtrogestan
-          ? 'ג׳ל אסטרדיול עורי (Estrogel / Sandrena) + דופסטון פומי'
-          : 'ג׳ל אסטרדיול עורי (Estrogel / Sandrena) + אוטרוגסטן מיקרוני'
-        : 'ג׳ל אסטרדיול עורי בלבד (Estrogel / Sandrena)',
-      subtitleHebrew: 'משטר Body-Identical גמיש בבטיחות ווסקולרית ומטבולית מרבית',
-      routeLabelHebrew: 'עורי (ג׳ל יומי)',
-      regimenLabelHebrew: needsEndometrialProtection
-        ? regimenType === 'CONTINUOUS_COMBINED'
-          ? 'משולב רציף'
-          : 'משולב ציקלי'
-        : 'אסטרוגן בלבד',
-      israeliProductsSummary: {
-        primaryAgent: `Estrogel 0.06%: ${estrogelDoseText} (או Sandrena שקיק יומי שווה-ערך)`,
-        secondaryProgestogenOrMonitor: progestogenText,
-        scheduleHebrew: needsEndometrialProtection
-          ? `מריחת ג׳ל יומית קבועה + ${progestogenText}`
-          : 'מריחת ג׳ל יומית קבועה ללא צורך בפרוגסטוגן'
-      },
-      prosHebrew: pros,
-      consHebrew: mhtBlocked ? [...gate.contraindicationNotices, ...cons] : cons,
-      tailoredMatchReasons: matchReasons,
-      monitoringNotesHebrew:
-        'הערכת תגובה קלינית כעבור 3 חודשים; אם אין הטבה מספקת תחת ג׳ל – לבדוק טכניקת מריחה ורמת Estradiol בסרום לשלילת תת-ספיגה עורית.'
-    });
-  }
-
-  // --- אופציה הורמונלית 2: התקן מירנה 52 מ"ג + אסטרדיול עורי (רלוונטי כשיש רחם) ---
-  if (needsEndometrialProtection) {
-    const failed = findPriorFailure(data.preferences.priorFailedTreatments, ['MIRENA_IUS']);
-    let score = mhtBlocked ? 4 : highCvRisk ? 35 : 86;
-    const matchReasons: string[] = [];
-    const pros: string[] = [
-      'מגן באופן ישיר ואמין ביותר על רירית הרחם ל-5 שנים ללא תלות בספיגה במעי, ב-GLP-1 או באנזימי כבד!',
-      'משמש בו-זמנית כאמצעי מניעה מצוין ומפחית ב-90% דימומים ווסתיים כבדים (HMB) ואנמיה.',
-      'חוסך תופעות לוואי סיסטמיות של פרוגסטרון פומי ומשאיר חופש לטיטרציית אסטרדיול עורי (ג׳ל או מדבקה).'
-    ];
-    const cons: string[] = [
-      'דורש פעולת התקנה גינקולוגית במרפאה; יתכנו הכתמות בחודשים הראשונים לאחר ההתקנה.',
-      'תוקף להגנת רירית תחת MHT הוא 5 שנים בלבד (חובה לתעד מועד החלפה!).'
-    ];
-
-    if (data.contraception.currentMethod === 'MIRENA_52MG') {
-      if (contraceptionEval.mirenaValidForMhtEndometrium) {
-        score += 12;
-        matchReasons.push('למטופלת כבר קיים התקן מירנה בתוקף (≤5 שנים) – ניתן להוסיף אסטרדיול עורי מיד!');
       } else {
-        cons.push('שים/י לב: המירנה הנוכחית מעל 5 שנים – חובה להחליפה לפני הסתמכות עליה להגנת הרירית!');
+        pros.push('לאחר כריתת רחם: אסטרוגן בלבד ללא צורך בפרוגסטוגן וללא עלייה בסיכון לסרטן שד.');
       }
-    }
-    if (contraceptionEval.needsContraception) {
-      score += 9;
-      matchReasons.push('עונה במדויק על הצורך הפעיל של המטופלת באמצעי מניעה במקביל ל-MHT!');
-    }
-    if (data.bleedingIntensity === 'HEAVY' || data.cbcStatus === 'ANEMIA' || data.medicalHistory.hasFibroidsOrAdenomyosis) {
-      score += 8;
-      matchReasons.push('אידיאלי לדימום ווסתי כבד / אדנומיוזיס / אנמיה.');
-    }
-    if (data.medications.takingGlp1 || data.medications.takingEnzymeInducers || data.medicalHistory.malabsorptionOrBariatricSurgery) {
-      score += 10;
-      matchReasons.push('הפתרון הבטוח ביותר להגנת הרירית תחת GLP-1 / משרני אנזימים / תת-ספיגה!');
-    }
-    if (endoRisk.riskTier === 'HIGH') {
-      score += 6;
-      matchReasons.push('מועדף בסיכון אנדומטריאלי מוגבר (BMI גבוה / PCOS / סוכרת).');
-    }
-    if (data.preferences.preferredRoute === 'MIRENA_BASED') {
-      score += 10;
-      matchReasons.push('תואם את העדפת המטופלת למשטר מבוסס מירנה.');
-    }
-    if (prefersNonHormonal) score -= 28;
-    if (failed) {
-      score -= 30;
-      cons.push(`מירנה נוסתה בעבר והופסקה (${failed.reasonStopped || 'אי-סבילות'}).`);
+
+      if (sym.hasSignificantSleepIssue && !blocksUtrogestan && needsEndometrialProtection) {
+        score += 4;
+        matchReasons.push('נותן מענה ישיר להפרעות השינה שדורגו בחשיבות גבוהה.');
+      }
+      if (patchDisqualified) {
+        score += 5;
+        matchReasons.push('פתרון עורי אידיאלי ללא חשיפה לדבק מדבקות.');
+      }
+      if (prefersBodyIdentical) {
+        score += 4;
+        matchReasons.push('תואם העדפת המטופלת להורמונים זהים-ביולוגית.');
+      }
+      if (data.preferences.preferredRoute === 'TRANSDERMAL_GEL') {
+        score += 8;
+        matchReasons.push('תואם העדפת המטופלת למריחת ג׳ל.');
+      }
+      if (prefersNonHormonal) score -= 26;
+
+      options.push({
+        id: 'opt_transdermal_gel_body_identical',
+        category: 'HORMONAL_SYSTEMIC',
+        rankScore: clampScore(score),
+        suitabilityBadge: prefersNonHormonal ? 'CONDITIONAL' : score >= 85 ? 'RECOMMENDED_TOP' : 'GOOD_ALTERNATIVE',
+        titleHebrew: needsEndometrialProtection
+          ? blocksUtrogestan
+            ? 'ג׳ל אסטרדיול עורי (Estrogel / Sandrena) + דופסטון פומי'
+            : 'ג׳ל אסטרדיול עורי (Estrogel / Sandrena) + אוטרוגסטן מיקרוני'
+          : 'ג׳ל אסטרדיול עורי בלבד (Estrogel / Sandrena)',
+        subtitleHebrew: 'בטיחות ווסקולרית ומטבולית מרבית עם גמישות במינון',
+        routeLabelHebrew: 'עורי (ג׳ל יומי)',
+        regimenLabelHebrew: needsEndometrialProtection
+          ? regimenType === 'CONTINUOUS_COMBINED'
+            ? 'משולב רציף'
+            : 'משולב ציקלי'
+          : 'אסטרוגן בלבד',
+        israeliProductsSummary: {
+          primaryAgent: `Estrogel 0.06%: ${estrogelDoseText} (או Sandrena שקיק יומי שווה-ערך)`,
+          secondaryProgestogenOrMonitor: progestogenText,
+          scheduleHebrew: needsEndometrialProtection
+            ? `מריחת ג׳ל יומית קבועה + ${progestogenText}`
+            : 'מריחת ג׳ל יומית קבועה ללא צורך בפרוגסטוגן'
+        },
+        prosHebrew: pros,
+        consHebrew: cons,
+        tailoredMatchReasons: matchReasons,
+        patientHowToTakeHebrew: patientSteps,
+        monitoringNotesHebrew:
+          'מעקב קליני בעוד 3 חודשים; בתת-תגובה תחת ג׳ל יש לבדוק טכניקת מריחה ורמת Estradiol בדם.'
+      });
+    } else {
+      excludedReasonsAudit.push(`ג׳ל אסטרדיול (Estrogel/Sandrena) סונן עקב ניסיון עבר שהופסק (${gelFailed.reasonStopped}).`);
     }
 
-    options.push({
-      id: 'opt_mirena_plus_transdermal_e2',
-      category: 'HORMONAL_SYSTEMIC',
-      rankScore: clampScore(score),
-      suitabilityBadge: mhtBlocked
-        ? 'CONTRAINDICATED_FOR_PATIENT'
-        : highCvRisk || prefersNonHormonal
-        ? 'CONDITIONAL'
-        : score >= 88
-        ? 'RECOMMENDED_TOP'
-        : 'GOOD_ALTERNATIVE',
-      titleHebrew: 'התקן מירנה 52 מ"ג + אסטרדיול עורי (Estrogel / Evorel)',
-      subtitleHebrew: 'הגנת רירית מקומית מלאה + מניעת הריון + אסטרדיול עורי בטוח',
-      routeLabelHebrew: 'תוך-רחמי + עורי',
-      regimenLabelHebrew: 'משולב רציף (ללא דמם גמילה)',
-      israeliProductsSummary: {
-        primaryAgent: `Estrogel (${estrogelDoseText}) או ${evorelDoseText}`,
-        secondaryProgestogenOrMonitor: 'Mirena 52mg IUS (בתוקף עד 5 שנים ממועד ההתקנה עבור MHT)',
-        scheduleHebrew: 'מירנה ברחם (עד 5 שנים) + אסטרדיול עורי רציף'
-      },
-      prosHebrew: pros,
-      consHebrew: mhtBlocked ? [...gate.contraindicationNotices, ...cons] : cons,
-      tailoredMatchReasons: matchReasons,
-      monitoringNotesHebrew: 'לוודא רישום תאריך התקנת המירנה בתיק (החלפה בתום 5 שנים תחת MHT).'
-    });
-  }
+    // --- אופציה הורמונלית 2: התקן מירנה 52 מ"ג + אסטרדיול עורי ---
+    if (needsEndometrialProtection && !mirenaFailed) {
+      let score = data.age >= 60 ? 70 : 88;
+      const matchReasons: string[] = [];
+      const pros: string[] = [
+        'הגנה מקומית ישירה ואמינה ביותר על רירית הרחם ל-5 שנים ללא תלות בספיגה במעי, ב-GLP-1 או באנזימי כבד!',
+        'משמש בו-זמנית כאמצעי מניעה יעיל ומפחית ב-90% דימומים ווסתיים כבדים (HMB) ואנמיה.',
+        'מכסה כל מדרגת מינון של אסטרדיול עורי (כולל מינונים גבוהים ב-POI/מנופאוזה מוקדמת).'
+      ];
+      const cons: string[] = [
+        'דורש פעולת התקנה/החלפה אצל גינקולוג/ית; יתכנו הכתמות בחודשים הראשונים להתקנה.',
+        'תוקף להגנת הרירית ב-MHT הוא 5 שנים בלבד ממועד ההתקנה.'
+      ];
 
-  // --- אופציה הורמונלית 3: מדבקות אסטרדיול (Evorel + אוטרוגסטן/דופסטון או Evorel Conti/Sequi) ---
-  {
-    const failed = findPriorFailure(data.preferences.priorFailedTreatments, ['EVOREL_PATCH']);
-    let score = mhtBlocked ? 4 : highCvRisk ? 36 : 87;
-    const matchReasons: string[] = [];
-    const useCombinedPatch =
-      needsEndometrialProtection &&
-      (blocksUtrogestan || data.medications.takingGlp1) &&
-      estrogenDoseTier === 'STANDARD';
+      const primaryTransdermalForMirena = !gelFailed
+        ? `Estrogel (${estrogelDoseText})`
+        : !patchDisqualified
+        ? evorelDoseText
+        : 'אסטרדיול עורי מותאם';
 
-    const pros: string[] = [
-      'החלפה פעמיים בשבוע בלבד (נוחות גבוהה לנשים ששוכחות מריחה יומית).',
-      'שחרור אסטרדיול אחיד ויציב לאורך 24 שעות (יתרון במיגרנה ללא/עם אאורה ובתנודות מצב רוח), ללא סיכון VTE.'
-    ];
-    if (useCombinedPatch) {
-      pros.push('מדבקה משולבת (Evorel Conti / Sequi) מספקת גם פרוגסטין דרך העור – עוקפת בעיית ספיגה של GLP-1 וללא סויה/בוטנים!');
-    }
-    const cons: string[] = [
-      'יתכן גירוי עורי מקומי מדבק המדבקה או התקלפות בקיץ/שחייה.'
-    ];
+      const patientSteps: string[] = [];
+      if (data.contraception.currentMethod === 'MIRENA_52MG' && contraceptionEval.mirenaValidForMhtEndometrium) {
+        score += 11;
+        matchReasons.push('למטופלת כבר קיים התקן מירנה תקף (≤5 שנים) – ניתן להוסיף אסטרדיול עורי מיד!');
+        patientSteps.push('התקן המירנה הקיים שלך בתוקף ומספק הגנה מלאה לרירית הרחם (יש להחליפו בתום 5 שנים ממועד ההתקנה).');
+      } else if (data.contraception.currentMethod === 'MIRENA_52MG' && !contraceptionEval.mirenaValidForMhtEndometrium) {
+        score += 9;
+        matchReasons.push('החלפת המירנה שפגה תוקף (>5 שנים) תשיב מיד שליטה בדימומים והגנת רירית מלאה!');
+        patientSteps.push('יש לתאם החלפת התקן המירנה הקיים (שחלפו מעל 5 שנים מהתקנתו) אצל רופא/ת נשים טרם/במקביל לאסטרדיול.');
+      } else {
+        patientSteps.push('יש לתאם התקנת התקן תוך-רחמי מירנה 52 מ"ג אצל רופא/ת נשים (בתוקף ל-5 שנים עבור הטיפול ההורמונלי).');
+      }
+      patientSteps.push(`שילוב אסטרוגן עורי יומי/דו-שבועי: ${primaryTransdermalForMirena}.`);
 
-    if (patchSensitivity) {
-      score -= 28;
-      cons.push('למטופלת מתועדת רגישות לדבק מדבקות – עדיף ג׳ל אסטרוג׳ל/סנדרנה!');
-    }
-    if (data.medicalHistory.migraineWithAura || data.medicalHistory.migraineWithoutAura) {
-      score += 5;
-      matchReasons.push('רמה הורמונלית יציבה במדבקה מפחיתה טריגרים הורמונליים למיגרנה.');
-    }
-    if (data.preferences.preferredRoute === 'TRANSDERMAL_PATCH') {
-      score += 10;
-      matchReasons.push('תואם את העדפת המטופלת למדבקות עוריות.');
-    }
-    if (prefersNonHormonal) score -= 28;
-    if (failed) {
-      score -= 26;
-      cons.push(`מדבקות נוסו בעבר והופסקו (${failed.reasonStopped || 'אי-סבילות'}).`);
+      if (contraceptionEval.needsContraception) {
+        score += 8;
+        matchReasons.push('נותן מענה מלא גם לצורך הפעיל במניעת הריון בפרי-מנופאוזה.');
+      }
+      if (data.bleedingIntensity === 'HEAVY' || data.cbcStatus === 'ANEMIA' || data.medicalHistory.hasFibroidsOrAdenomyosis) {
+        score += 8;
+        matchReasons.push('בחירת הזהב לדימום ווסתי כבד / שרירנים / אנמיה.');
+      }
+      if (data.medications.takingGlp1 || data.medications.takingEnzymeInducers || data.medicalHistory.malabsorptionOrBariatricSurgery) {
+        score += 10;
+        matchReasons.push('עוקף לחלוטין בעיית ספיגה של פרוגסטוגן פומי תחת GLP-1 / משרני אנזימים / בריאטריה!');
+      }
+      if (endoRisk.riskTier === 'HIGH') {
+        score += 6;
+        matchReasons.push('הגנה מרבית בסיכון אנדומטריאלי מוגבר (BMI גבוה / PCOS / סוכרת).');
+      }
+      if (data.preferences.preferredRoute === 'MIRENA_BASED') {
+        score += 9;
+        matchReasons.push('תואם את העדפת המטופלת למשטר מבוסס מירנה.');
+      }
+      if (prefersNonHormonal) score -= 26;
+
+      options.push({
+        id: 'opt_mirena_plus_transdermal_e2',
+        category: 'HORMONAL_SYSTEMIC',
+        rankScore: clampScore(score),
+        suitabilityBadge: prefersNonHormonal ? 'CONDITIONAL' : score >= 88 ? 'RECOMMENDED_TOP' : 'GOOD_ALTERNATIVE',
+        titleHebrew:
+          data.contraception.currentMethod === 'MIRENA_52MG' && !contraceptionEval.mirenaValidForMhtEndometrium
+            ? 'החלפת מירנה פגת-תוקף למירנה 52 מ"ג חדשה + אסטרדיול עורי'
+            : 'התקן מירנה 52 מ"ג + אסטרדיול עורי (Estrogel / Evorel)',
+        subtitleHebrew: 'הגנת רירית מקומית מלאה ל-5 שנים + מניעת הריון + אסטרדיול עורי בטוח',
+        routeLabelHebrew: 'תוך-רחמי + עורי',
+        regimenLabelHebrew: 'משולב רציף (ללא דמם גמילה)',
+        israeliProductsSummary: {
+          primaryAgent: primaryTransdermalForMirena,
+          secondaryProgestogenOrMonitor: 'Mirena 52mg IUS (בתוקף ל-5 שנים עבור MHT)',
+          scheduleHebrew: 'מירנה ברחם (החלפה כל 5 שנים) + אסטרדיול עורי רציף'
+        },
+        prosHebrew: pros,
+        consHebrew: cons,
+        tailoredMatchReasons: matchReasons,
+        patientHowToTakeHebrew: patientSteps,
+        monitoringNotesHebrew: 'לתעד בתיק תאריך התקנת המירנה ומועד החלפה בעוד 5 שנים.'
+      });
+    } else if (mirenaFailed) {
+      excludedReasonsAudit.push(`התקן מירנה סונן עקב ניסיון עבר שהופסק (${mirenaFailed.reasonStopped}).`);
     }
 
-    const secondaryPatchProg = !needsEndometrialProtection
-      ? undefined
-      : useCombinedPatch
-      ? isPostmenopausalOver1Year
-        ? 'כלול במדבקת Evorel Conti (NETA 170 מק"ג)'
-        : 'כלול בערכת Evorel Sequi'
-      : blocksUtrogestan
-      ? 'Duphaston 10 מ"ג פומי'
-      : regimenType === 'CONTINUOUS_COMBINED'
-      ? utrogestanContinuousDose
-      : utrogestanSequentialDose;
+    // --- אופציה הורמונלית 3: מדבקות אסטרדיול עוריות (רק אם אין רגישות לדבק ולא נכשלו בעבר!) ---
+    if (!patchDisqualified) {
+      let score = data.age >= 60 ? 72 : 89;
+      const matchReasons: string[] = [];
+      const useCombinedPatch =
+        needsEndometrialProtection &&
+        (blocksUtrogestan || data.medications.takingGlp1) &&
+        estrogenDoseTier === 'STANDARD';
 
-    options.push({
-      id: 'opt_transdermal_patch_regimen',
-      category: 'HORMONAL_SYSTEMIC',
-      rankScore: clampScore(score),
-      suitabilityBadge: mhtBlocked
-        ? 'CONTRAINDICATED_FOR_PATIENT'
-        : patchSensitivity || highCvRisk || prefersNonHormonal
-        ? 'CONDITIONAL'
-        : score >= 86
-        ? 'RECOMMENDED_TOP'
-        : 'GOOD_ALTERNATIVE',
-      titleHebrew: !needsEndometrialProtection
-        ? `מדבקות אסטרדיול בלבד (${evorelDoseText})`
+      const pros: string[] = [
+        'החלפה פעמיים בשבוע בלבד (נוחות גבוהה ללא צורך במריחה יומית).',
+        'שחרור אסטרדיול אחיד ויציב לאורך היממה – מפחית תנודות הורמונליות ומיגרנות, ללא סיכון VTE.'
+      ];
+      if (useCombinedPatch) {
+        pros.push('מדבקה משולבת (Evorel Conti / Sequi) מספקת גם פרוגסטין דרך העור – עוקפת בעיית ספיגה תחת GLP-1 וללא סויה/בוטנים!');
+      }
+      const cons: string[] = ['יש להדביק על עור יבש מתחת לקו המותניים ולהחליף צד בכל החלפה למניעת גירוי עורי.'];
+
+      if (data.medicalHistory.migraineWithAura || data.medicalHistory.migraineWithoutAura) {
+        score += 5;
+        matchReasons.push('רמת אסטרדיול יציבה במדבקה מפחיתה טריגרים הורמונליים למיגרנה.');
+      }
+      if (data.preferences.preferredRoute === 'TRANSDERMAL_PATCH') {
+        score += 9;
+        matchReasons.push('תואם את העדפת המטופלת למדבקה דו-שבועית.');
+      }
+      if (prefersNonHormonal) score -= 26;
+
+      const secondaryPatchProg = !needsEndometrialProtection
+        ? undefined
         : useCombinedPatch
         ? isPostmenopausalOver1Year
-          ? 'מדבקה משולבת אוורל קונטי (Evorel Conti)'
-          : 'מדבקה משולבת ציקלית אוורל סקווי (Evorel Sequi)'
-        : `מדבקות אסטרדיול (${evorelDoseText}) + פרוגסטוגן מותאם`,
-      subtitleHebrew: 'ספיגה עורית דו-שבועית יציבה ללא מעבר ראשון בכבד',
-      routeLabelHebrew: 'עורי (מדבקה דו-שבועית)',
-      regimenLabelHebrew: !needsEndometrialProtection
-        ? 'אסטרוגן בלבד'
-        : isPostmenopausalOver1Year
-        ? 'משולב רציף'
-        : 'משולב ציקלי',
-      israeliProductsSummary: {
-        primaryAgent: useCombinedPatch
+          ? 'כלול במדבקת Evorel Conti (NETA 170 מק"ג)'
+          : 'כלול בערכת Evorel Sequi'
+        : blocksUtrogestan
+        ? isPostmenopausalOver1Year
+          ? 'Duphaston 10 מ"ג טבליה ביום ברצף'
+          : 'Duphaston 10 מ"ג ליום למשך 14 ימים בחודש'
+        : regimenType === 'CONTINUOUS_COMBINED'
+        ? utrogestanContinuousDose
+        : utrogestanSequentialDose;
+
+      const patchSteps: string[] = [
+        `הדביקי מדבקה אחת מתחת לקו המותניים (ישבן או ירך עליונה – לעולם לא על או ליד השדיים!) על עור נקי, יבש וללא קרם גוף, והחליפי פעמיים בשבוע בימים קבועים (למשל ראשון ורביעי).`
+      ];
+      if (secondaryPatchProg && !useCombinedPatch) {
+        patchSteps.push(`הגנת רירית הרחם: טלי במקביל ${secondaryPatchProg}.`);
+      }
+
+      options.push({
+        id: 'opt_transdermal_patch_regimen',
+        category: 'HORMONAL_SYSTEMIC',
+        rankScore: clampScore(score),
+        suitabilityBadge: prefersNonHormonal ? 'CONDITIONAL' : score >= 86 ? 'RECOMMENDED_TOP' : 'GOOD_ALTERNATIVE',
+        titleHebrew: !needsEndometrialProtection
+          ? `מדבקות אסטרדיול בלבד (${evorelDoseText})`
+          : useCombinedPatch
           ? isPostmenopausalOver1Year
-            ? 'Evorel Conti (E2 50mcg + NETA 170mcg)'
-            : 'Evorel Sequi'
-          : evorelDoseText,
-        secondaryProgestogenOrMonitor: secondaryPatchProg,
-        scheduleHebrew: 'הדבקה מתחת לקו המותניים והחלפה פעמיים בשבוע בימים קבועים'
-      },
-      prosHebrew: pros,
-      consHebrew: mhtBlocked ? [...gate.contraindicationNotices, ...cons] : cons,
-      tailoredMatchReasons: matchReasons
-    });
-  }
-
-  // --- אופציה הורמונלית 4: טבליות פומיות (Femoston / Activelle / Eviana / Estrofem / Duavive) ---
-  {
-    const failed = findPriorFailure(data.preferences.priorFailedTreatments, ['ORAL_FEMOSTON', 'ORAL_COMBINED_NETA']);
-    const oralContraindicated = mhtBlocked || routePreference === 'TRANSDERMAL_MANDATORY' || highCvRisk;
-    let score = oralContraindicated ? 8 : routePreference === 'TRANSDERMAL_PREFERRED' ? 62 : 82;
-    const matchReasons: string[] = [];
-    const pros: string[] = [
-      'טבליה יומית פשוטה ומוכרת באריזה אחת (אפס סיכון לשכוח את מרכיב הפרוגסטוגן בכדור משולב!).',
-      'דידרוגסטרון ב-Femoston בטוח באלרגיית בוטנים/סויה ובעל פרופיל מטבולי ושד נוח יותר מ-NETA.'
-    ];
-    const cons: string[] = [
-      'מעבר ראשון בכבד: מעלה במעט סיכון ל-VTE, מעלה SHBG (עלול להפחית טסטוסטרון חופשי וחשק מיני) ומעלה TBG.'
-    ];
-
-    if (oralContraindicated && !mhtBlocked) {
-      cons.unshift(
-        `אסטרוגן פומי אינו מומלץ למטופלת זו בשל: ${routeRationale.join(' | ')}`
-      );
-    }
-    if (data.preferences.preferredRoute === 'ORAL_TABLET' && !oralContraindicated) {
-      score += 10;
-      matchReasons.push('תואם את העדפת המטופלת לנטילה פומית יומית (בהיעדר התווית נגד לקרישה/כבד).');
-    }
-    if (prefersNonHormonal) score -= 28;
-    if (failed) {
-      score -= 25;
-      cons.push(`כדור הורמונלי פומי נוסה בעבר והופסק (${failed.reasonStopped || 'תופעות לוואי'}).`);
+            ? 'מדבקה משולבת אוורל קונטי (Evorel Conti)'
+            : 'מדבקה משולבת ציקלית אוורל סקווי (Evorel Sequi)'
+          : `מדבקות אסטרדיול (${evorelDoseText}) + פרוגסטוגן מותאם`,
+        subtitleHebrew: 'ספיגה עורית דו-שבועית יציבה ללא מעבר ראשון בכבד',
+        routeLabelHebrew: 'עורי (מדבקה דו-שבועית)',
+        regimenLabelHebrew: !needsEndometrialProtection
+          ? 'אסטרוגן בלבד'
+          : isPostmenopausalOver1Year
+          ? 'משולב רציף'
+          : 'משולב ציקלי',
+        israeliProductsSummary: {
+          primaryAgent: useCombinedPatch
+            ? isPostmenopausalOver1Year
+              ? 'Evorel Conti (E2 50mcg + NETA 170mcg)'
+              : 'Evorel Sequi'
+            : evorelDoseText,
+          secondaryProgestogenOrMonitor: secondaryPatchProg,
+          scheduleHebrew: 'הדבקה מתחת לקו המותניים והחלפה פעמיים בשבוע בימים קבועים'
+        },
+        prosHebrew: pros,
+        consHebrew: cons,
+        tailoredMatchReasons: matchReasons,
+        patientHowToTakeHebrew: patchSteps
+      });
     }
 
-    const oralAgent = !needsEndometrialProtection
-      ? estrogenDoseTier === 'LOW'
-        ? 'Estrofem 1mg טבליה ביום'
-        : 'Estrofem 1–2mg או Progynova 2mg טבליה ביום'
-      : isPostmenopausalOver1Year
-      ? estrogenDoseTier === 'LOW'
-        ? 'Femoston Conti 0.5/2.5 (או Eviana 0.5/0.1)'
-        : 'Femoston Conti 1/5 (או Activelle 1/0.5; או Duavive באי-סבילות לפרוגסטוגנים)'
-      : isHighEstrogenTier
-      ? 'Femoston 2/10 (טבליה ביום ברצף)'
-      : 'Femoston 1/10 (או Novofem)';
+    // --- אופציה הורמונלית 4: טבליות פומיות (מוצגת אך ורק אם מתן פומי מותר ולא נפסל!) ---
+    const allOralFailed = Boolean(oralFemostonFailed && oralNetaFailed && needsEndometrialProtection);
+    if (routePreference !== 'TRANSDERMAL_MANDATORY' && !allOralFailed) {
+      let score = routePreference === 'TRANSDERMAL_PREFERRED' ? 66 : 82;
+      const matchReasons: string[] = [];
+      const pros: string[] = [
+        'טבליה יומית פשוטה ונוחה באריזה אחת – מונעת שכחה של מרכיב הפרוגסטוגן.'
+      ];
+      const cons: string[] = [
+        'מעבר ראשון בכבד: עלייה קלה בסיכון VTE וברמות SHBG/TBG בהשוואה למתן עורי.'
+      ];
 
+      let oralAgent = '';
+      if (!needsEndometrialProtection) {
+        oralAgent = estrogenDoseTier === 'LOW' ? 'Estrofem 1mg טבליה ביום' : 'Estrofem 1–2mg או Progynova 2mg טבליה ביום';
+      } else if (!oralFemostonFailed) {
+        pros.push('Femoston מכיל דידרוגסטרון (פרופיל בטיחות טוב לשד ולמטבוליזם וללא אלרגיית בוטנים/סויה).');
+        oralAgent = isPostmenopausalOver1Year
+          ? estrogenDoseTier === 'LOW'
+            ? 'Femoston Conti 0.5/2.5 טבליה ביום'
+            : 'Femoston Conti 1/5 (או Duavive באי-סבילות לפרוגסטוגנים)'
+          : isHighEstrogenTier
+          ? 'Femoston 2/10 טבליה ביום ברצף'
+          : 'Femoston 1/10 טבליה ביום ברצף';
+      } else if (!oralNetaFailed) {
+        excludedReasonsAudit.push(`Femoston סונן עקב ניסיון עבר שהופסק (${oralFemostonFailed?.reasonStopped}).`);
+        oralAgent = isPostmenopausalOver1Year
+          ? 'Activelle 1/0.5 או Eviana 0.5/0.1 (או Duavive ללא פרוגסטוגן)'
+          : 'Novofem טבליה ביום';
+      }
+
+      if (oralNetaFailed && !oralFemostonFailed) {
+        excludedReasonsAudit.push(`Activelle/NETA סונן עקב ניסיון עבר שהופסק (${oralNetaFailed.reasonStopped}).`);
+      }
+
+      if (data.preferences.preferredRoute === 'ORAL_TABLET') {
+        score += 10;
+        matchReasons.push('תואם העדפת המטופלת לכדור פומי יומי (נמצא בטוח עבורה).');
+      }
+      if (prefersNonHormonal) score -= 26;
+
+      options.push({
+        id: 'opt_oral_mht_regimen',
+        category: 'HORMONAL_SYSTEMIC',
+        rankScore: clampScore(score),
+        suitabilityBadge:
+          routePreference === 'TRANSDERMAL_PREFERRED' || prefersNonHormonal ? 'CONDITIONAL' : 'GOOD_ALTERNATIVE',
+        titleHebrew: !needsEndometrialProtection
+          ? 'אסטרדיול פומי בלבד (Estrofem / Progynova)'
+          : isPostmenopausalOver1Year
+          ? 'טבליה משולבת רציפה פומית (Femoston Conti / Duavive)'
+          : 'טבליה משולבת ציקלית פומית (Femoston 1/10 או 2/10)',
+        subtitleHebrew: 'נטילה פומית בכדור יומי אחד לנשים בסיכון קרישתי ומטבולי נמוך',
+        routeLabelHebrew: 'פומי (כדור אחד ביום)',
+        regimenLabelHebrew: !needsEndometrialProtection
+          ? 'אסטרוגן בלבד'
+          : isPostmenopausalOver1Year
+          ? 'משולב רציף'
+          : 'משולב ציקלי',
+        israeliProductsSummary: {
+          primaryAgent: oralAgent,
+          scheduleHebrew: 'טבליה אחת ביום בשעה קבועה ברצף בין חפיסות'
+        },
+        prosHebrew: pros,
+        consHebrew: cons,
+        tailoredMatchReasons: matchReasons,
+        patientHowToTakeHebrew: [
+          `טלי טבליה אחת של ${oralAgent} מדי יום בשעה קבועה, ברצף ללא הפסקה בין חפיסות.`,
+          ...(data.medications.takingLevothyroxine
+            ? ['מאחר שאת נוטלת אלטרוקסין, יש לבצע בדיקת דם ל-TSH כעבור 6–12 שבועות מתחילת הטיפול הפומי.']
+            : [])
+        ],
+        monitoringNotesHebrew: data.medications.takingLevothyroxine
+          ? 'לבדוק TSH כעבור 6–12 שבועות מתחילת אסטרוגן פומי.'
+          : undefined
+      });
+    }
+  } else if (meningiomaBlocksProgestogen && !mhtBlocked && isPostmenopausalOver1Year && routePreference !== 'TRANSDERMAL_MANDATORY') {
+    // במנינגיומה עם רחם שמור בפוסט-מנופאוזה וללא סיכון VTE: Duavive (ללא פרוגסטוגן!) הוא הפתרון ההורמונלי היחיד המותר
+    excludedReasonsAudit.push('משטרים המכילים פרוגסטוגן סוננו עקב היסטוריה של מנינגיומה.');
     options.push({
-      id: 'opt_oral_mht_regimen',
+      id: 'opt_duavive_progestogen_free',
       category: 'HORMONAL_SYSTEMIC',
-      rankScore: clampScore(score),
-      suitabilityBadge: oralContraindicated
-        ? 'CONTRAINDICATED_FOR_PATIENT'
-        : routePreference === 'TRANSDERMAL_PREFERRED' || prefersNonHormonal
-        ? 'CONDITIONAL'
-        : 'GOOD_ALTERNATIVE',
-      titleHebrew: !needsEndometrialProtection
-        ? 'אסטרדיול פומי בלבד (Estrofem / Progynova)'
-        : isPostmenopausalOver1Year
-        ? 'טבליה משולבת רציפה פומית (Femoston Conti / Activelle / Duavive)'
-        : 'טבליה משולבת ציקלית פומית (Femoston 1/10 או 2/10)',
-      subtitleHebrew: oralContraindicated
-        ? 'לא מומלץ למטופלת זו (נדרש מתן עורי או לא-הורמונלי)'
-        : 'נוחות נטילה בכדור יומי אחד לנשים בסיכון קרישתי ומטבולי נמוך',
-      routeLabelHebrew: 'פומי (כדור אחד ביום)',
-      regimenLabelHebrew: !needsEndometrialProtection
-        ? 'אסטרוגן בלבד'
-        : isPostmenopausalOver1Year
-        ? 'משולב רציף'
-        : 'משולב ציקלי',
+      rankScore: prefersNonHormonal ? 65 : 84,
+      suitabilityBadge: 'GOOD_ALTERNATIVE',
+      titleHebrew: 'דואביב (Duavive – קומפלקס TSEC ללא פרוגסטוגן!)',
+      subtitleHebrew: 'מגן על רירית הרחם באמצעות Bazedoxifene ללא חשיפה לפרוגסטוגנים',
+      routeLabelHebrew: 'פומי יומי (ללא פרוגסטוגן)',
+      regimenLabelHebrew: 'TSEC רציף ללא דימום',
       israeliProductsSummary: {
-        primaryAgent: oralAgent,
-        scheduleHebrew: 'טבליה אחת ביום בשעה קבועה ללא הפסקה בין חפיסות'
+        primaryAgent: 'Duavive (CE 0.45mg + Bazedoxifene 20mg) טבליה ביום',
+        scheduleHebrew: 'טבליה שלמה אחת ביום עם או בלי אוכל'
       },
-      prosHebrew: pros,
-      consHebrew: mhtBlocked ? [...gate.contraindicationNotices, ...cons] : cons,
-      tailoredMatchReasons: matchReasons,
-      monitoringNotesHebrew: data.medications.takingLevothyroxine
-        ? 'חובה לבדוק TSH כעבור 6–12 שבועות מתחילת אסטרוגן פומי!'
-        : undefined
+      prosHebrew: ['ללא כל מרכיב פרוגסטוגני – מתאים באי-סבילות קשה לפרוגסטוגנים או מנינגיומה.'],
+      consHebrew: ['מתן פומי – אין לרשום בסיכון VTE מוגבר.'],
+      tailoredMatchReasons: ['נבחר כפתרון נטול-פרוגסטוגן עקב היסטוריה של מנינגיומה.'],
+      patientHowToTakeHebrew: ['טלי טבליה שלמה אחת של דואביב פעם ביום בשעה קבועה (אין לחצות או לרסק).']
     });
   }
 
   // =========================================================================
-  // אפשרויות טיפול לא-הורמונליות (תמיד מוצגות ומדורגות, ועולות למקום #1 בהתוויות נגד או בהעדפת המטופלת!)
+  // אופציות לא-הורמונליות מתאימות בלבד (מסננות תרופות שנפסלו בכבד / ניסיון עבר!)
   // =========================================================================
+  const liverBlocked = data.medicalHistory.activeLiverDiseaseOrPorphyria || data.lftStatus === 'ABNORMAL';
 
-  // --- אופציה לא-הורמונלית 1: Veoza 45mg (Fezolinetant) ו/או Lynkuet 120mg (Elinzanetant) ---
-  {
-    const failed = findPriorFailure(data.preferences.priorFailedTreatments, ['VEOZA_NK3']);
-    const liverBlocked = data.medicalHistory.activeLiverDiseaseOrPorphyria || data.lftStatus === 'ABNORMAL';
-    let score = liverBlocked ? 10 : mhtBlocked || highCvRisk ? 94 : prefersNonHormonal ? 91 : 72;
+  // --- לא-הורמונלי 1: Veoza 45mg / Lynkuet 120mg (מוצג רק אם אין מחלת כבד ולא נכשל בעבר!) ---
+  if (!liverBlocked && !veozaFailed) {
+    let score = mhtBlocked || data.age >= 60 ? 94 : prefersNonHormonal ? 92 : 73;
     const matchReasons: string[] = [];
     const pros: string[] = [
-      'מנגנון נוירו-אנדוקריני ממוקד ומודרני (חסימת NK3 בהיפותלמוס) ללא כל חשיפה לאסטרוגן או פרוגסטוגן וללא סיכון VTE/דימום רחמי!',
-      'תחילת השפעה מהירה מאוד (תוך שבוע אחד!) על תדירות ועוצמת גלי החום והזעות הלילה.',
-      'Lynkuet 120mg (אלינזנטנט – חוסם כפול NK1/NK3) מוסיף שיפור מובהק באיכות השינה.'
+      'מנגנון לא-הורמונלי ייעודי (חסימת NK3 במרכז ויסות החום בהיפותלמוס) – אפס סיכון VTE או דימום רחמי.',
+      'הקלה מהירה מאוד בגלי חום והזעות לילה כבר מהשבוע הראשון לטיפול!',
+      'Lynkuet 120mg (אלינזנטנט) מוסיף שיפור מובהק בשינה ואושר גם תחת טיפול אנדוקריני בסרטן שד (OASIS-4).'
     ];
     const cons: string[] = [
-      'מחייב בדיקת תפקודי כבד (ALT, AST, בילירובין) לפני ההתחלה ומעקב בחודשים 1, 2, 3, 6 ו-9 (אזהרת EMA/משרד הבריאות 2025).',
-      'אינו מטפל ביובש נרתיקי (GSM – יש לשלב תכשיר מקומי) ואינו מונע איבוד מסת עצם (ב-POI/אוסטיאופורוזיס נדרש מענה ייעודי לעצם).'
+      'מחייב בדיקת תפקודי כבד (ALT, AST, בילירובין) לפני התחלה ובחודשים 1, 2, 3, 6 ו-9.',
+      'אינו מונע איבוד עצם ואינו מטפל ביובש נרתיקי (ניתן לשלב תכשיר מקומי מהרשימה למטה).'
     ];
 
-    if (mhtBlocked) {
-      matchReasons.push('בחירה לא-הורמונלית ממוקדת ויעילה בהינתן התווית נגד ל-MHT סיסטמי.');
-    }
-    if (prefersNonHormonal) {
-      matchReasons.push('מדורג בעדיפות עליונה בהתאם להעדפת המטופלת להימנע מהורמונים.');
-    }
-    if (sym.hasModerateSevereVms) {
-      score += 3;
-      matchReasons.push('מתאים במיוחד לגלי חום בינוניים-קשים שדווחו בשאלון הסימפטומים.');
-    }
-    if (data.medications.takingTamoxifen || data.medicalHistory.breastCancerHistory) {
-      cons.push('במטופלות תחת טיפול אונקולוגי פעיל מומלץ תיאום אונקולוגי ובדיקת עלון היצרן העדכני.');
-    }
-    if (liverBlocked) {
-      cons.unshift('תפקודי כבד חריגים / מחלת כבד פעילה: אין להתחיל ויוזה אם ALT/AST ≥ 2x ULN או בילירובין מוגבר!');
-    }
-    if (failed) {
-      score -= 30;
-      cons.push(`ויוזה נוסתה בעבר והופסקה (${failed.reasonStopped || 'חוסר סבילות'}).`);
-    }
+    if (mhtBlocked) matchReasons.push('בחירה לא-הורמונלית יעילה וממוקדת עבור מטופלת שבה MHT סיסטמי נפסל.');
+    if (prefersNonHormonal) matchReasons.push('מדורג בעדיפות עליונה בהתאם להעדפת המטופלת להימנע מהורמונים.');
+    if (data.age >= 60) matchReasons.push('מועדף בגיל ≥60 וסיכון קרדיו-וסקולרי מוגבר ללא סיכון פקקתי.');
+    if (sym.hasModerateSevereVms) score += 3;
 
     options.push({
       id: 'opt_nonhormonal_nk3_veoza_lynkuet',
       category: 'NON_HORMONAL_SYSTEMIC',
       rankScore: clampScore(score),
-      suitabilityBadge: liverBlocked
-        ? 'CONTRAINDICATED_FOR_PATIENT'
-        : score >= 85
-        ? 'RECOMMENDED_TOP'
-        : 'GOOD_ALTERNATIVE',
+      suitabilityBadge: score >= 86 ? 'RECOMMENDED_TOP' : 'GOOD_ALTERNATIVE',
       titleHebrew: 'חוסם קולטן NK3 לא-הורמונלי: ויוזה (Veoza 45mg) / לינקואט (Lynkuet 120mg)',
       subtitleHebrew: 'טיפול ייעודי לא-הורמונלי במרכז ויסות החום בהיפותלמוס',
       routeLabelHebrew: 'פומי לא-הורמונלי',
       regimenLabelHebrew: 'לא-הורמונלי יומי',
       israeliProductsSummary: {
         primaryAgent: sym.hasSignificantSleepIssue
-          ? 'Veoza 45mg פעם ביום (או Lynkuet 120mg בערב לשיפור כפול של גלי חום ושינה)'
+          ? 'Veoza 45mg פעם ביום (או Lynkuet 120mg בערב לגלי חום ושינה)'
           : 'Veoza (Fezolinetant) 45mg טבליה אחת ביום בשעה קבועה',
-        secondaryProgestogenOrMonitor: 'ניטור LFTs (ALT/AST/Bilirubin): בסיס, חודש 1, 2, 3, 6 ו-9',
-        scheduleHebrew: 'נטילה יומית קבועה ללא צורך בפרוגסטוגן'
+        secondaryProgestogenOrMonitor: 'ניטור LFTs בדם (ALT/AST/Bilirubin): בסיס, חודש 1, 2, 3, 6 ו-9',
+        scheduleHebrew: 'טבליה אחת ביום בשעה קבועה'
       },
       prosHebrew: pros,
       consHebrew: cons,
       tailoredMatchReasons: matchReasons,
-      monitoringNotesHebrew:
-        'לבצע בדיקת ALT, AST ובילירובין בדם טרם מרשם ראשון ולוודא תקינות (<2x ULN), ולתזמן מעקב מעבדה בחודשים 1, 2, 3, 6 ו-9.'
+      patientHowToTakeHebrew: [
+        'טלי טבליה אחת של ויוזה 45 מ"ג פעם ביום בשעה קבועה עם מים (עם או בלי אוכל).',
+        'חשוב לבצע בדיקות דם לתפקודי כבד (ALT, AST ובילירובין) לפני התחלת הכדור, ולאחר מכן בחודש 1, חודש 2, חודש 3, חודש 6 וחודש 9.',
+        'במקרה של עייפות חריגה, בחילה ממושכת, גרד, שתן כהה או הצהבת עור/עיניים – הפסיקי מיד ופני לרופא/ה.'
+      ],
+      monitoringNotesHebrew: 'לוודא ALT/AST < 2x ULN ובילירובין תקין טרם מרשם ראשון, ולתזמן מעקב חודשים 1, 2, 3, 6, 9.'
     });
+  } else {
+    excludedReasonsAudit.push(
+      liverBlocked
+        ? 'ויוזה / לינקואט (חוסמי NK3) סוננו עקב מחלת כבד או תפקודי כבד חריגים.'
+        : `ויוזה סוננה עקב ניסיון עבר שהופסק (${veozaFailed?.reasonStopped}).`
+    );
   }
 
-  // --- אופציה לא-הורמונלית 2: SNRI / SSRI (ונלפקסין / אציטלופרם – בטוחים תחת טמוקסיפן!) ---
-  {
-    const failed = findPriorFailure(data.preferences.priorFailedTreatments, ['SSRI_SNRI']);
-    let score = mhtBlocked || highCvRisk ? 90 : prefersNonHormonal ? 85 : 64;
+  // --- לא-הורמונלי 2: ונלפקסין / אציטלופרם (רק אם לא נכשלו בעבר; מותאם אוטומטית לטמוקסיפן ול"ד!) ---
+  if (!ssriFailed) {
+    const uncontrolledBp = data.medicalHistory.hypertensionStatus === 'UNCONTROLLED';
+    let score = mhtBlocked || data.age >= 60 ? 90 : prefersNonHormonal ? 86 : 65;
     const matchReasons: string[] = [];
     const pros: string[] = [
-      'מפחית גלי חום ב-50%–60% בתוך 2–4 שבועות ומשפר במקביל חרדה, עצבנות ותנודות מצב רוח.',
-      'ונלפקסין (Venlafaxine) ואציטלופרם (Cipralex) בטוחים לחלוטין בשילוב עם טמוקסיפן (אינם מעכבים CYP2D6!).',
-      'זמינים בסל הבריאות בעלות נמוכה וללא צורך בניטור כבדי חודשי.'
+      'מפחית גלי חום ב-50%–60% תוך 2–4 שבועות ומשפר במקביל חרדה ותנודות מצב רוח.',
+      'בטוח לחלוטין תחת טמוקסיפן (אינו מעכב CYP2D6 – בניגוד לפאקסט/פרוזק שאסורים!).',
+      'זמין בסל הבריאות וללא צורך בניטור כבדי חודשי.'
     ];
     const cons: string[] = [
-      'יתכנו בחילה קלה בשבוע הראשון, יובש בפה או פגיעה בחשק המיני/אורגזמה.',
-      'בוונלפקסין יש לעקוב אחר לחץ דם ולהימנע מהפסקה פתאומית.'
+      'יתכנו בחילה חולפת בשבוע הראשון או ירידה בחשק המיני; אין להפסיק בפתאומיות.'
     ];
 
     if (data.medications.takingTamoxifen || data.medications.takingAromataseInhibitors || data.medicalHistory.breastCancerHistory) {
       score += 6;
-      matchReasons.push('קו ראשון מבוסס ובטוח אונקולוגית בסרטן שד ונטילת טמוקסיפן (איסור על Paroxetine/Fluoxetine!).');
+      matchReasons.push('בחירה בטוחה ומוכחת במטופלות סרטן שד ונוטלות טמוקסיפן.');
     }
     if (sym.hasSignificantMoodOrFog) {
       score += 4;
-      matchReasons.push('נותן מענה כפול לגלי החום ולתסמיני החרדה/מצב הרוח שדווחו.');
+      matchReasons.push('נותן מענה משולב לגלי החום ולתסמיני מצב הרוח/החרדה.');
     }
-    if (data.medicalHistory.hypertensionStatus === 'UNCONTROLLED') {
-      cons.push('בל"ד לא מאוזן העדיפי אציטלופרם (Cipralex 10mg) על פני ונלפקסין.');
-    }
-    if (failed) {
-      score -= 28;
-      cons.push(`SSRI/SNRI נוסו בעבר והופסקו (${failed.reasonStopped || 'תופעות לוואי'}).`);
-    }
+
+    const agentText = uncontrolledBp
+      ? 'Escitalopram (Cipralex) 10mg פעם ביום בבוקר (נבחר על פני ונלפקסין בשל ל"ד לא מאוזן)'
+      : 'Venlafaxine XR 37.5mg ליום לשבוע ראשון ואז 75mg (או Escitalopram 10mg)';
 
     options.push({
       id: 'opt_nonhormonal_snri_ssri',
       category: 'NON_HORMONAL_SYSTEMIC',
       rankScore: clampScore(score),
       suitabilityBadge: score >= 85 ? 'RECOMMENDED_TOP' : 'GOOD_ALTERNATIVE',
-      titleHebrew:
-        data.medicalHistory.hypertensionStatus === 'UNCONTROLLED'
-          ? 'אציטלופרם (Cipralex 10–20mg) – SSRI לא-הורמונלי'
-          : 'ונלפקסין XR (37.5–75 מ"ג) או אציטלופרם (10–20 מ"ג)',
-      subtitleHebrew: 'טיפול לא-הורמונלי מוכח לגלי חום ותסמיני מצב רוח/חרדה (בטוח עם טמוקסיפן)',
+      titleHebrew: uncontrolledBp
+        ? 'אציטלופרם (Cipralex 10–20mg) – SSRI לא-הורמונלי'
+        : 'ונלפקסין XR (37.5–75 מ"ג) או אציטלופרם (10–20 מ"ג)',
+      subtitleHebrew: 'טיפול לא-הורמונלי מוכח לגלי חום וחרדה/מצב רוח (בטוח עם טמוקסיפן)',
       routeLabelHebrew: 'פומי לא-הורמונלי',
       regimenLabelHebrew: 'לא-הורמונלי יומי',
       israeliProductsSummary: {
-        primaryAgent:
-          data.medicalHistory.hypertensionStatus === 'UNCONTROLLED'
-            ? 'Escitalopram (Cipralex) 10mg בבוקר'
-            : 'Venlafaxine XR 37.5mg ליום לשבוע ראשון ואז 75mg (או Escitalopram 10mg)',
+        primaryAgent: agentText,
         secondaryProgestogenOrMonitor: data.medications.takingTamoxifen
-          ? 'אזהרה: לעולם לא להחליף ל-Paroxetine או Fluoxetine תחת טמוקסיפן!'
+          ? 'אזהרה: אין להחליף לעולם ל-Paroxetine או Fluoxetine תחת טמוקסיפן!'
           : undefined,
-        scheduleHebrew: 'נטילה יומית קבועה; השפעה על גלי חום מורגשת תוך 2–4 שבועות'
+        scheduleHebrew: 'נטילה יומית קבועה עם אוכל'
       },
       prosHebrew: pros,
       consHebrew: cons,
-      tailoredMatchReasons: matchReasons
+      tailoredMatchReasons: matchReasons,
+      patientHowToTakeHebrew: [
+        `טלי ${agentText} מדי בוקר עם האוכל (השפעה מיטבית על גלי החום מורגשת תוך 2–4 שבועות; אין להפסיק את הכדור בבת אחת ללא ייעוץ).`
+      ]
     });
+  } else {
+    excludedReasonsAudit.push(`SSRI/SNRI סוננו עקב ניסיון עבר שהופסק (${ssriFailed.reasonStopped}).`);
   }
 
-  // --- אופציה לא-הורמונלית 3: גאבאפנטין (לילה) / אוקסיבוטינין / CBT-MENOS ---
+  // --- לא-הורמונלי 3: גאבאפנטין לילי + CBT-MENOS (תמיד זמין כחלופה בטוחה; אוקסיבוטינין רק מתחת לגיל 65) ---
   {
-    let score = mhtBlocked || highCvRisk ? 82 : prefersNonHormonal ? 80 : 58;
+    let score = mhtBlocked ? 84 : prefersNonHormonal ? 81 : 58;
     const matchReasons: string[] = [];
     if (sym.hasSignificantSleepIssue) {
       score += 6;
-      matchReasons.push('גאבאפנטין בנטילת לילה יעיל במיוחד להזעות לילה ויקיצות מרובות.');
+      matchReasons.push('גאבאפנטין בנטילת ערב יעיל במיוחד להזעות לילה ויקיצות מרובות.');
     }
-    const urinary14 = data.symptoms['14']?.severity || 0;
-    if (urinary14 >= 2 && data.age < 65) {
+    const allowOxy = data.age < 65 && (data.symptoms['14']?.severity || 0) >= 2;
+    if (allowOxy) {
       score += 4;
-      matchReasons.push('אוקסיבוטינין נותן מענה משולב להזעות יתר ולדחיפות/תכיפות במתן שתן.');
+      matchReasons.push('אוקסיבוטינין מספק מענה משולב להזעת יתר ולדחיפות במתן שתן.');
     }
 
     options.push({
@@ -689,99 +731,154 @@ export function formulateTreatment(data: Stage1Data): Stage2Recommendations {
       category: 'NON_HORMONAL_SYSTEMIC',
       rankScore: clampScore(score),
       suitabilityBadge: score >= 84 ? 'RECOMMENDED_TOP' : 'GOOD_ALTERNATIVE',
-      titleHebrew: 'גאבאפנטין לילי (300–900 מ"ג) / אוקסיבוטינין + פרוטוקול CBT-MENOS',
-      subtitleHebrew: 'חלופות לא-הורמונליות להזעות לילה, שינה, הזעת יתר וויסות קוגניטיבי-התנהגותי',
+      titleHebrew: allowOxy
+        ? 'גאבאפנטין לילי (300–900 מ"ג) / אוקסיבוטינין + פרוטוקול CBT-MENOS'
+        : 'גאבאפנטין לילי (300–900 מ"ג) + פרוטוקול CBT-MENOS והיפנוזה קלינית',
+      subtitleHebrew: 'טיפול לא-הורמונלי להזעות לילה, שינה וויסות קוגניטיבי-התנהגותי',
       routeLabelHebrew: 'פומי לא-הורמונלי + התנהגותי',
       regimenLabelHebrew: 'מותאם תסמין מוביל',
       israeliProductsSummary: {
-        primaryAgent:
-          urinary14 >= 2 && data.age < 65
-            ? 'Gabapentin 300mg לפני השינה (טיטרציה עד 900mg) או Oxybutynin 2.5–5mg + CBT-MENOS'
-            : 'Gabapentin 300mg לפני השינה (טיטרציה עד 600–900mg) + פרוטוקול CBT-MENOS והיפנוזה קלינית',
+        primaryAgent: allowOxy
+          ? 'Gabapentin 300mg לפני השינה (או Oxybutynin 2.5–5mg) + CBT-MENOS'
+          : 'Gabapentin 300mg לפני השינה (טיטרציה עד 600–900mg) + תוכנית CBT-MENOS',
         scheduleHebrew: 'נטילת ערב לפני השינה + 4–6 מפגשי CBT ממוקד גיל המעבר'
       },
       prosHebrew: [
-        'בטוח לחלוטין במטופלות סרטן שד (ללא אינטראקציות CYP2D6 עם טמוקסיפן) ובסיכון פקקתי.',
-        'גאבאפנטין משפר שינה רציפה וכאבים נוירופתיים/שריריים; CBT-MENOS מפחית ב-50% את מצוקת גלי החום ללא תופעות לוואי.'
+        'בטוח בסרטן שד (ללא אינטראקציות עם טמוקסיפן), בסיכון פקקתי ובמחלת כבד קלה.',
+        'גאבאפנטין משפר שינה רציפה; CBT-MENOS מפחית ב-50% את מצוקת גלי החום.'
       ],
-      consHebrew: [
-        'גאבאפנטין עלול לגרום לנמנום/סחרחורת בבוקר; באוקסיבוטינין יובש בפה ולהימנע בגיל המבוגר.'
-      ],
-      tailoredMatchReasons: matchReasons
+      consHebrew: ['גאבאפנטין עלול לגרום לנמנום בוקר בימים הראשונים – להתחיל במינון 300 מ"ג בערב.'],
+      tailoredMatchReasons: matchReasons,
+      patientHowToTakeHebrew: [
+        'טלי כמוסת גאבאפנטין 300 מ"ג שעה לפני השינה (ניתן להעלות בהדרגה לפי הנחיית הרופא/ה), בשילוב תרגול פרוטוקול CBT לגיל המעבר והלבשה בשכבות.'
+      ]
     });
   }
 
-  // מיון מהציון הגבוה לנמוך כך שהאופציות המתאימות ביותר למטופלת תופענה ראשונות!
   options.sort((a, b) => b.rankScore - a.rankScore);
 
   // =========================================================================
-  // תוספות מקומיות וממוקדות: GSM (יובש/שתן) ו-HSDD (טסטוסטרון לחשק מיני)
+  // טיפולים מקומיים ל-GSM – מופרדים לחלוטין (תכשירי לחות ≠ אינטררוזה ≠ אסטרוגן נרתיקי ≠ אוספמיפן) ובחירה מרובה!
   // =========================================================================
-  const localAndAdjunctOptions: LocalOrAdjunctOption[] = [];
+  const localGsmOptions: LocalGsmOption[] = [];
+  const hasBreastCaOrEndocrineTx =
+    data.medicalHistory.breastCancerHistory ||
+    data.medications.takingTamoxifen ||
+    data.medications.takingAromataseInhibitors;
 
-  const onAiOrBreastCa = data.medications.takingAromataseInhibitors || data.medicalHistory.breastCancerHistory;
-  localAndAdjunctOptions.push({
-    id: 'local_gsm_vaginal_estrogen',
-    domain: 'GSM_VAGINAL',
-    recommended: sym.hasSignificantGsm && !onAiOrBreastCa,
-    titleHebrew: 'אסטרוגן נרתיקי מקומי (Vagifem 10mcg / Ovestin / Imvaggis 0.03mg)',
-    brandAndDoseHebrew: 'טבליות וגיפם 10 מק"ג / קרם או פתילות אובסטין / פתילות אימווגיס 0.03 מ"ג (אולטרה-נמוך)',
-    scheduleHebrew: 'פעם ביום למשך שבועיים (העמסה), ואז פעמיים בשבוע בקביעות לטווח ארוך (ניתן לשלב גם במקביל ל-MHT סיסטמי!)',
+  // 1. תכשירי לחות נרתיקיים וחומרי סיכה (לא-הורמונלי – מופרד מאינטררוזה, מתאים ל-100% מהמטופלות!)
+  localGsmOptions.push({
+    id: 'gsm_moisturizers_lubricants',
+    recommended: sym.hasSignificantGsm,
+    isHormonal: false,
+    titleHebrew: 'תכשירי לחות נרתיקיים וחומצה היאלורונית + חומרי סיכה (לא-הורמונלי)',
+    brandAndDoseHebrew: 'תכשיר לחות קבוע (Replens / Gynomunal / חומצה היאלורונית) + מסכך על בסיס מים או סיליקון ביחסים',
+    scheduleHebrew: 'תכשיר לחות 2–3 פעמים בשבוע בקביעות + חומר סיכה בכל מגע מיני (ניתן לשילוב עם כל תכשיר אחר!)',
     prosHebrew: [
-      'מטפל ביעילות גבוהה ביובש נרתיקי, כאבים ביחסים, דחיפות במתן שתן ומונע דלקות שתן חוזרות.',
-      'ספיגה סיסטמית זניחה – אינו דורש תוספת פרוגסטוגן וניתן לשימוש בכל גיל (כולל מעל 60 ובסיכון VTE).'
+      '100% נטול הורמונים ובטוח לחלוטין בכל מצב רפואי (כולל סרטן שד ומעכבי ארומטאז).',
+      'משלים ומשפר נוחות יומיומית גם לצד אסטרוגן נרתיקי או אינטררוזה.'
     ],
-    cautionsHebrew: onAiOrBreastCa
-      ? [
-          'בסרטן שד / מעכבי ארומטאז: יש להתחיל בתכשירי לחות לא-הורמונליים; אם כשלו – לשקול Imvaggis 0.03mg או וגיפם בתיאום מתועד עם האונקולוג/ית.'
-        ]
-      : ['יש להדריך שהפסקת הטיפול תוביל לחזרת היובש (זהו טיפול אחזקה מתמשך ובטוח).']
+    cautionsHebrew: ['להקפיד על תכשיר איזואוסמולרי ב-pH חומצי מותאם לנרתיק.'],
+    patientInstructionsHebrew:
+      'שימוש בתכשיר לחות נרתיקי (כגון Replens / חומצה היאלורונית) 2–3 פעמים בשבוע בקביעות לשיקום הלחות, ובנוסף חומר סיכה (מים/סיליקון) בעת קיום יחסי מין.'
   });
 
-  localAndAdjunctOptions.push({
-    id: 'local_gsm_moisturizer_prasterone',
-    domain: 'GSM_VAGINAL',
-    recommended: sym.hasSignificantGsm && onAiOrBreastCa,
-    titleHebrew: onAiOrBreastCa
-      ? 'תכשירי לחות נרתיקיים לא-הורמונליים + חומצה היאלורונית וחומר סיכה'
-      : 'אינטררוזה (Prasterone / DHEA 6.5mg) או תכשירי לחות נרתיקיים',
-    brandAndDoseHebrew: onAiOrBreastCa
-      ? 'Replens / Gynomunal (2–3 פעמים בשבוע) + מסכך על בסיס מים/סיליקון ביחסים'
-      : 'Intrarosa 6.5mg פתילה נרתיקית לילית או תכשירי לחות לא-הורמונליים',
-    scheduleHebrew: onAiOrBreastCa ? '2–3 פעמים בשבוע בקביעות + לפני מגע מיני' : 'פתילה כל ערב (Intrarosa) או 2–3 פעמים בשבוע (לחות)',
-    prosHebrew: [
-      onAiOrBreastCa
-        ? 'נטול הורמונים ב-100% ובטוח לחלוטין תחת טמוקסיפן ומעכבי ארומטאז.'
-        : 'אינטררוזה משפרת גם דיספראוניה וגם עוררות/תחושה מקומית הודות להמרה תוך-תאית מקומית ללא עלייה ברמות בדם.'
-    ],
-    cautionsHebrew: onAiOrBreastCa ? [] : ['אינטררוזה נמנעת כקו ראשון בסרטן שד פעיל ללא אישור אונקולוגי.']
-  });
+  // 2. אסטרוגן נרתיקי מקומי (מוסתר תחת מעכבי ארומטאז פעילים ללא אישור אונקולוגי; מותר בטמוקסיפן עם הערת תיאום לפי NICE 2024)
+  if (!data.medications.takingAromataseInhibitors) {
+    localGsmOptions.push({
+      id: 'gsm_vaginal_estrogen',
+      recommended: sym.hasSignificantGsm && !data.medicalHistory.breastCancerHistory,
+      isHormonal: true,
+      titleHebrew: 'אסטרוגן נרתיקי מקומי (Vagifem 10mcg / Ovestin / Imvaggis 0.03mg)',
+      brandAndDoseHebrew: data.medicalHistory.breastCancerHistory
+        ? 'Imvaggis 0.03mg אסטריול אולטרה-נמוך / Vagifem 10mcg (בתיאום אונקולוגי לאחר מיצוי לחות)'
+        : 'טבליות וגיפם 10 מק"ג / קרם או פתילות אובסטין / אימווגיס 0.03 מ"ג',
+      scheduleHebrew: 'פעם ביום לשבועיים (העמסה), ולאחר מכן פעמיים בשבוע בקביעות לטווח ארוך',
+      prosHebrew: [
+        'הטיפול היעיל ביותר ליובש נרתיקי, כאבים ביחסים, דחיפות במתן שתן ומניעת דלקות שתן חוזרות.',
+        'ספיגה סיסטמית זניחה – בטוח בכל גיל ובסיכון VTE ואינו דורש תוספת פרוגסטוגן!'
+      ],
+      cautionsHebrew: data.medicalHistory.breastCancerHistory
+        ? ['בהיסטוריה של סרטן שד יש למצות לחות נרתיקית תחילה ולתאם עם האונקולוג/ית (לפי NICE 2024 אפשרי בייחוד תחת טמוקסיפן או ב-ER שלילי).']
+        : ['טיפול אחזקה מתמשך – בהפסקתו היובש צפוי לחזור.'],
+      patientInstructionsHebrew:
+        'החדירי לנרתיק טבליית וגיפם 10 מק"ג / מריחת אובסטין / פתילת אימווגיס פעם ביום לפני השינה למשך שבועיים ראשונים, ולאחר מכן פעמיים בשבוע בקביעות.'
+    });
+  } else {
+    excludedReasonsAudit.push('אסטרוגן נרתיקי מקומי לא הוצג כבחירה אוטומטית בשל נטילת מעכב ארומטאז פעיל (קו ראשון לחות לא-הורמונלית; דורש אישור אונקולוגי פרטני).');
+  }
 
-  localAndAdjunctOptions.push({
-    id: 'adjunct_testosterone_hsdd',
-    domain: 'HSDD_TESTOSTERONE',
-    recommended: sym.hasSignificantHsdd && !mhtBlocked,
-    titleHebrew: 'שקילת טסטוסטרון עורי במינון נשי (ל-HSDD – ירידה בתשוקה הגורמת מצוקה)',
-    brandAndDoseHebrew: 'ג׳ל טסטוסטרון 1% (למשל AndroGel במינון נשי Off-label: ~5 מ"ג/יום = טיפה בגודל אפונה; שקית 50 מ"ג ל-8–10 ימים)',
-    scheduleHebrew: 'מריחה יומית על הירך החיצונית/שוק לאחר איזון אסטרוגן (עורי!) וטיפול ביובש נרתיקי',
-    prosHebrew: [
-      'משפר תשוקה מינית, עוררות ושביעות רצון בפוסט-מנופאוזה או לאחר BSO/RRSO (הקונצנזוס הבינלאומי ו-BMS).'
-    ],
-    cautionsHebrew: [
-      'חובה לבדוק Total Testosterone לפני ההתחלה, כעבור 3–6 שבועות וכל 6–12 חודשים לשמירה בטווח הנשי הפיזיולוגי (ניסיון של 3–6 חודשים).'
-    ]
-  });
+  // 3. אינטררוזה – פראסטרון נרתיקי (מופרד לחלוטין מתכשירי הלחות! מוצג רק אם אין סרטן שד ובפוסט-מנופאוזה)
+  if (!hasBreastCaOrEndocrineTx && isPostmenopausalOver1Year) {
+    localGsmOptions.push({
+      id: 'gsm_intrarosa_prasterone',
+      recommended: sym.hasSignificantGsm && sym.hasSignificantHsdd,
+      isHormonal: true,
+      titleHebrew: 'אינטררוזה – פראסטרון / DHEA נרתיקי (Intrarosa 6.5mg)',
+      brandAndDoseHebrew: 'פתילות נרתיקיות Intrarosa 6.5mg (Prasterone)',
+      scheduleHebrew: 'פתילה נרתיקית אחת מדי לילה לפני השינה',
+      prosHebrew: [
+        'מומר תוך-תאית ברקמת הנרתיק לאסטרוגן ולאנדרוגן מקומיים ללא עלייה ברמות בדם.',
+        'משפר יובש נרתיקי, דיספראוניה (כאב ביחסים) ותחושה/עוררות מקומית.'
+      ],
+      cautionsHebrew: ['אין לשלב בו-זמנית באותו לילה עם טבליית אסטרוגן נרתיקי תוך-נרתיקי (לבחור אחד מהם + לחות לפי צורך).'],
+      patientInstructionsHebrew:
+        'החדירי פתילה אחת של אינטררוזה 6.5 מ"ג לנרתיק מדי ערב לפני השינה.'
+    });
+  }
 
-  // דף תיאום ציפיות למטופלת
+  // 4. אוספמיפן פומי (מוצג רק בפוסט-מנופאוזה ללא סרטן שד וללא סיכון VTE)
+  if (!hasBreastCaOrEndocrineTx && isPostmenopausalOver1Year && !vte.mandatoryTransdermal && data.bmi < 30) {
+    localGsmOptions.push({
+      id: 'gsm_ospemifene_oral',
+      recommended: false,
+      isHormonal: true,
+      titleHebrew: 'אוספמיפן פומי ל-GSM (Senshio 60mg)',
+      brandAndDoseHebrew: 'טבליות Senshio (Ospemifene) 60 מ"ג בנטילה פומית',
+      scheduleHebrew: 'טבליה אחת ביום עם האוכל',
+      prosHebrew: ['פתרון בכדור פומי לנשים עם GSM שאינן מעוניינות במריחה/החדרה נרתיקית.'],
+      cautionsHebrew: ['SERM פומי – עלול להחמיר זמנית גלי חום אצל חלק מהנשים.'],
+      patientInstructionsHebrew: 'טלי טבליה אחת של סנשיו 60 מ"ג פעם ביום עם האוכל.'
+    });
+  }
+
+  // =========================================================================
+  // מקטע נפרד לחלוטין: טסטוסטרון עורי נשי ל-HSDD (מוצג רק כאשר מותר רפואית למטופלת!)
+  // =========================================================================
+  let testosteroneOption: TestosteroneHsddOption | undefined;
+  if (!hasBreastCaOrEndocrineTx && !liverBlocked) {
+    testosteroneOption = {
+      id: 'hsdd_transdermal_testosterone',
+      recommended: sym.hasSignificantHsdd,
+      titleHebrew: 'טסטוסטרון עורי במינון נשי פיזיולוגי (עבור HSDD – ירידה בתשוקה המינית הגורמת מצוקה)',
+      brandAndDoseHebrew: 'ג׳ל טסטוסטרון 1% (כגון AndroGel במינון נשי Off-label: ~5 מ"ג ליום = טיפה בגודל אפונה; שקית 50 מ"ג מספיקה ל-8–10 ימים)',
+      scheduleHebrew: 'מריחה יומית על עור נקי ויבש בירך החיצונית או השוק התחתונה',
+      prerequisitesHebrew: [
+        'להקפיד שהאסטרוגן הסיסטמי ניתן דרך העור (ג׳ל/מדבקה) ולא פומית – אסטרוגן פומי מעלה SHBG ומנטרל טסטוסטרון חופשי!',
+        'לוודא שקודם/במקביל ניתן מענה מלא ליובש או כאב נרתיקי (GSM).'
+      ],
+      prosHebrew: [
+        'הטיפול התרופתי המבוסס היחיד לשיפור חשק מיני, עוררות ושביעות רצון מינית בפוסט-מנופאוזה ולאחר כריתת שחלות (BSO/RRSO).'
+      ],
+      monitoringProtocolHebrew: [
+        'בדיקת דם ל-Total Testosterone (ו-SHBG) לפני תחילת הטיפול (בסיס).',
+        'בדיקת דם חוזרת כעבור 3–6 שבועות ובהמשך כל 6–12 חודשים לוודא שהרמה בטווח הפיזיולוגי של אישה צעירה.',
+        'ניסיון טיפולי של 3–6 חודשים (להפסיק אם אין שיפור קליני או אם מופיעים אקנה/שיעור יתר).'
+      ],
+      patientInstructionsHebrew:
+        'מרחי טיפה קטנה בגודל אפונה של ג׳ל טסטוסטרון (שקית אחת של 50 מ"ג מספיקה ל-8 עד 10 ימים!) על עור נקי בירך החיצונית/שוק מדי יום, שטפי ידיים במים וסבון מיד לאחר המריחה, ובצעי בדיקת דם לרמת טסטוסטרון בעוד 4–6 שבועות.'
+    };
+  }
+
+  // נקודות תיאום ציפיות כלליות
   const patientExpectationPoints: string[] = [
-    'ציר זמן לשיפור: הקלה ראשונית בגלי חום ושינה מתחילה תוך 2–4 שבועות, והשפעה מלאה נבחנת בביקור מעקב כעבור 3 חודשים.',
-    'התאמה אישית מדורגת: במידה שנותרים תסמינים חשובים או מופיעות תופעות לוואי (כגון רגישות בשדיים או נפיחות חולפת בחודשים הראשונים), ניתן לדייק מינון או להחליף תכשיר בביקור המעקב.',
+    'ציר זמן לשיפור: הקלה ראשונית בגלי חום ושינה מתחילה תוך 2–4 שבועות, והשפעה מלאה מוערכת בביקור מעקב כעבור 3 חודשים.',
     needsEndometrialProtection && !mhtBlocked
-      ? 'דימומים תחת טיפול הורמונלי: הכתמות קלות שכיחות ב-3–6 החודשים הראשונים לטיפול רציף; יש לדווח בביקור המעקב או לפנות מוקדם יותר אם מופיע דימום כבד, ממושך או חדש לאחר חצי שנה.'
-      : 'ניטור בטיחות: יש להקפיד על בדיקות המעקב שהומלצו (כגון ממוגרפיה לפי גיל, ל"ד, או תפקודי כבד תחת ויוזה בחודשים 1, 2, 3, 6 ו-9).',
+      ? 'דימומים תחת טיפול הורמונלי: הכתמות קלות שכיחות ב-3–6 החודשים הראשונים; יש לדווח אם מופיע דימום כבד, ממושך או חדש לאחר חצי שנה.'
+      : 'ניטור בטיחות: יש להקפיד על בדיקות המעקב והסקר שהוגדרו עבורך.',
     contraceptionEval.needsContraception
-      ? `תזכורת חשובה: טיפול הורמונלי לגיל המעבר (HRT) אינו מונע הריון! ${contraceptionEval.contraceptionRuleHebrew}`
-      : 'אורח חיים תומך: אימוני התנגדות ונושאי משקל פעמיים-שלוש בשבוע, תזונה ים-תיכונית עשירה בחלבון וסידן, ותוסף ויטמין D שומרים על העצם, השריר והלב.',
+      ? `מניעת הריון: טיפול הורמונלי לגיל המעבר (HRT) אינו מונע הריון! ${contraceptionEval.contraceptionRuleHebrew}`
+      : 'אורח חיים תומך: אימוני כוח/התנגדות פעמיים-שלוש בשבוע, תזונה ים-תיכונית עשירה בסידן וחלבון ותוסף ויטמין D שומרים על העצם, השריר והלב.',
     boneRisk.riskTier !== 'LOW' ? boneRisk.guidanceHebrew : ''
   ].filter(Boolean);
 
@@ -791,11 +888,9 @@ export function formulateTreatment(data: Stage1Data): Stage2Recommendations {
     `שלב STRAW+10: ${straw.hebrewName} (${straw.code})`,
     `ציון חומרה IMS: ${sym.totalSeverityScore}/76 (${sym.activeSymptomCount} תסמינים פעילים)`,
     prevent.hasCompleteLabInputs
-      ? `סיכון קרדיו-וסקולרי AHA PREVENT: 10y Total CVD ${prevent.risk10YearTotalCvd}% | ASCVD ${prevent.risk10YearAscvd}%${
-          prevent.risk30YearTotalCvd ? ` | 30y Total CVD ${prevent.risk30YearTotalCvd}%` : ''
-        }`
+      ? `סיכון קרדיו-וסקולרי AHA PREVENT: 10y Total CVD ${prevent.risk10YearTotalCvd}% | ASCVD ${prevent.risk10YearAscvd}%`
       : '',
-    `משטר וציר מומלצים: ${regimenHebrewTitle} | אופציה מדורגת #1: ${topOption?.titleHebrew || ''}`
+    `משטר מומלץ: ${regimenHebrewTitle} | אופציה מדורגת #1: ${topOption?.titleHebrew || ''}`
   ]
     .filter(Boolean)
     .join('\n');
@@ -808,7 +903,9 @@ export function formulateTreatment(data: Stage1Data): Stage2Recommendations {
     routePreference,
     routeRationale,
     rankedOptions: options,
-    localAndAdjunctOptions,
+    excludedReasonsAudit,
+    localGsmOptions,
+    testosteroneOption,
     patientExpectationPoints,
     followUpIntervalMonths: 3,
     emrSummaryText

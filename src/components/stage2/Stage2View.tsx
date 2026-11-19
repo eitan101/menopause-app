@@ -3,10 +3,13 @@ import {
   ArrowLeft,
   Check,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   Clock,
   Copy,
   FileCheck2,
   Filter,
+  Flame,
   MessageSquarePlus,
   Pill,
   Printer,
@@ -17,7 +20,8 @@ import {
   ThumbsUp,
   Trash2
 } from 'lucide-react';
-import { ISRAELI_DRUG_ARSENAL } from '../../clinical-engine/data/drugArsenal';
+import { getEligibleArsenalForPatient } from '../../clinical-engine/data/drugArsenal';
+import { buildStage2PatientInstructions } from '../../clinical-engine/patientInstructionsBuilder';
 import { formulateTreatment } from '../../clinical-engine/treatmentEngine';
 import {
   PatientRecord,
@@ -27,6 +31,7 @@ import {
   TreatmentOptionCard
 } from '../../clinical-engine/types';
 import { generateEmrSummary } from '../../services/emrExportService';
+import { PatientOutputCard } from '../common/PatientOutputCard';
 
 interface Stage2ViewProps {
   record: PatientRecord;
@@ -62,30 +67,51 @@ export const Stage2View: React.FC<Stage2ViewProps> = ({
   onPrintPatientLeaflet
 }) => {
   const recs = useMemo(() => formulateTreatment(stage1Data), [stage1Data]);
+  const eligibleArsenal = useMemo(() => getEligibleArsenalForPatient(stage1Data), [stage1Data]);
 
   const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'HORMONAL_SYSTEMIC' | 'NON_HORMONAL_SYSTEMIC'>('ALL');
+  const [showAuditReasons, setShowAuditReasons] = useState(false);
   const [noteInput, setNoteInput] = useState('');
   const [arsenalQuery, setArsenalQuery] = useState('');
   const [copiedEmr, setCopiedEmr] = useState(false);
 
-  // תוכנית פעילה (או ברירת מחדל לאופציה המדורגת #1)
-  const activeOptionId = selectedPlan?.selectedPrimaryOptionId || recs.rankedOptions[0]?.id || '';
-  const currentPlan: SelectedTreatmentPlan = selectedPlan || {
-    selectedPrimaryOptionId: activeOptionId,
-    selectedGsmOptionId: recs.localAndAdjunctOptions.find((l) => l.domain === 'GSM_VAGINAL' && l.recommended)?.id,
-    includeTestosterone: false,
-    selectionRationaleTags: [],
-    selectionRationaleFreeText: '',
-    selectedAtIso: new Date().toISOString()
-  };
+  // תוכנית פעילה – בחירה מרובה של תוספות מקומיות (selectedGsmOptionIds) וטסטוסטרון מופרד!
+  const defaultGsmIds = recs.localGsmOptions.filter((l) => l.recommended).map((l) => l.id);
+  const activeOptionId =
+    selectedPlan?.selectedPrimaryOptionId &&
+    recs.rankedOptions.some((o) => o.id === selectedPlan.selectedPrimaryOptionId)
+      ? selectedPlan.selectedPrimaryOptionId
+      : recs.rankedOptions[0]?.id || '';
+
+  const currentPlan: SelectedTreatmentPlan = selectedPlan
+    ? {
+        ...selectedPlan,
+        selectedPrimaryOptionId: activeOptionId
+      }
+    : {
+        selectedPrimaryOptionId: activeOptionId,
+        selectedGsmOptionIds: defaultGsmIds,
+        includeTestosterone: false,
+        selectionRationaleTags: [],
+        selectionRationaleFreeText: '',
+        stage2PatientInstructionsFreeText: '',
+        selectedAtIso: new Date().toISOString()
+      };
 
   const chosenOption = recs.rankedOptions.find((o) => o.id === currentPlan.selectedPrimaryOptionId);
+  const stage2PatientOutput = useMemo(
+    () => buildStage2PatientInstructions(stage1Data, recs, currentPlan),
+    [stage1Data, recs, currentPlan]
+  );
+
+  const hormonalCount = recs.rankedOptions.filter((o) => o.category === 'HORMONAL_SYSTEMIC').length;
+  const nonHormonalCount = recs.rankedOptions.filter((o) => o.category === 'NON_HORMONAL_SYSTEMIC').length;
 
   const visibleOptions = recs.rankedOptions.filter((opt) =>
     categoryFilter === 'ALL' ? true : opt.category === categoryFilter
   );
 
-  const filteredArsenal = ISRAELI_DRUG_ARSENAL.filter(
+  const filteredArsenal = eligibleArsenal.filter(
     (d) =>
       !arsenalQuery.trim() ||
       d.brandName.toLowerCase().includes(arsenalQuery.toLowerCase()) ||
@@ -97,6 +123,19 @@ export const Stage2View: React.FC<Stage2ViewProps> = ({
     onSelectPlan({
       ...currentPlan,
       selectedPrimaryOptionId: opt.id,
+      selectedAtIso: new Date().toISOString()
+    });
+  };
+
+  // בחירה מרובה (Multi-Select) של תוספות מקומיות ל-GSM!
+  const toggleLocalGsmOption = (gsmId: string) => {
+    const exists = currentPlan.selectedGsmOptionIds.includes(gsmId);
+    const nextIds = exists
+      ? currentPlan.selectedGsmOptionIds.filter((id) => id !== gsmId)
+      : [...currentPlan.selectedGsmOptionIds, gsmId];
+    onSelectPlan({
+      ...currentPlan,
+      selectedGsmOptionIds: nextIds,
       selectedAtIso: new Date().toISOString()
     });
   };
@@ -136,16 +175,12 @@ export const Stage2View: React.FC<Stage2ViewProps> = ({
       cls: 'bg-emerald-100 text-emerald-900 border-emerald-300'
     },
     GOOD_ALTERNATIVE: {
-      label: 'חלופה טיפולית מתאימה',
+      label: 'חלופה טיפולית מתאימה ובטוחה',
       cls: 'bg-teal-50 text-teal-900 border-teal-200'
     },
     CONDITIONAL: {
-      label: 'אפשרי בתנאים מסוימים / קו שני',
+      label: 'מתאים כעדיפות שנייה',
       cls: 'bg-amber-100 text-amber-900 border-amber-300'
-    },
-    CONTRAINDICATED_FOR_PATIENT: {
-      label: 'לא מומלץ / התווית נגד למטופלת זו',
-      cls: 'bg-rose-100 text-rose-900 border-rose-300'
     }
   };
 
@@ -157,7 +192,7 @@ export const Stage2View: React.FC<Stage2ViewProps> = ({
           <div className="space-y-2">
             <div className="inline-flex items-center gap-2 bg-white/15 px-3 py-1 rounded-full text-xs font-semibold">
               <Sparkles className="w-4 h-4 text-teal-200" />
-              <span>שלב 2: הגדרת הטיפול, השוואת חלופות ותיעוד ההחלטה המשותפת</span>
+              <span>שלב 2: תרופות מתאימות בלבד למטופלת, השוואת חלופות ותיעוד ההחלטה</span>
             </div>
             <h2 className="text-xl font-extrabold">{recs.regimenHebrewTitle}</h2>
             <p className="text-xs text-teal-100 leading-relaxed max-w-4xl">
@@ -190,22 +225,45 @@ export const Stage2View: React.FC<Stage2ViewProps> = ({
               className="flex items-center gap-1.5 bg-white text-teal-900 hover:bg-teal-50 text-xs font-bold px-4 py-2.5 rounded-xl shadow-sm transition"
             >
               <Printer className="w-4 h-4" />
-              <span>דף הדרכה ותיאום ציפיות למטופלת</span>
+              <span>הדפס דף הנחיות למטופלת</span>
             </button>
           </div>
         </div>
+
+        {/* חיווי שקיפות על סינון אוטומטי של תרופות שנפסלו בשאלון (ללא הצגתן ככרטיסי טיפול) */}
+        {recs.excludedReasonsAudit.length > 0 && (
+          <div className="mt-4 pt-3 border-t border-white/15 text-xs">
+            <button
+              type="button"
+              onClick={() => setShowAuditReasons(!showAuditReasons)}
+              className="flex items-center gap-1.5 text-teal-200 hover:text-white font-semibold"
+            >
+              {showAuditReasons ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              <span>
+                סוננו אוטומטית {recs.excludedReasonsAudit.length} קבוצות/תכשירים שנפסלו עבור מטופלת זו (מוצגות אך ורק תרופות מתאימות)
+              </span>
+            </button>
+            {showAuditReasons && (
+              <ul className="mt-2 space-y-1 text-[11px] text-teal-100 bg-black/20 p-3 rounded-xl">
+                {recs.excludedReasonsAudit.map((reason, idx) => (
+                  <li key={idx}>• {reason}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* 2. השוואת אופציות טיפול מדורגות (הורמונליות + לא-הורמונליות) עם יתרונות וחסרונות */}
+      {/* 2. השוואת אופציות טיפול סיסטמיות מתאימות בלבד */}
       <section className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
               <Filter className="w-4 h-4 text-teal-600" />
-              <span>אפשרויות טיפול מדורגות לפי התאמה אישית למטופלת (כולל הורמונלי ולא-הורמונלי)</span>
+              <span>אפשרויות טיפול סיסטמיות מתאימות למטופלת (מדורגות לפי התאמה אישית)</span>
             </h3>
             <p className="text-xs text-slate-500">
-              הדירוג משקלל שלב STRAW+10, חשיבות תסמינים (IMS), סיכוני PREVENT/VTE/רירית, אינטראקציות, העדפות וטיפולי עבר
+              תרופות וצירי מתן שנפסלו בשלב איסוף הנתונים או בטיפולי עבר אינם מוצגים ברשימה זו
             </p>
           </div>
 
@@ -217,19 +275,21 @@ export const Stage2View: React.FC<Stage2ViewProps> = ({
                 categoryFilter === 'ALL' ? 'bg-teal-700 text-white' : 'text-slate-600 hover:bg-slate-100'
               }`}
             >
-              הכל מדורג ({recs.rankedOptions.length})
+              כל המתאימים ({recs.rankedOptions.length})
             </button>
-            <button
-              type="button"
-              onClick={() => setCategoryFilter('HORMONAL_SYSTEMIC')}
-              className={`px-3 py-1.5 rounded-lg transition ${
-                categoryFilter === 'HORMONAL_SYSTEMIC'
-                  ? 'bg-teal-700 text-white'
-                  : 'text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              הורמונלי סיסטמי (MHT)
-            </button>
+            {hormonalCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setCategoryFilter('HORMONAL_SYSTEMIC')}
+                className={`px-3 py-1.5 rounded-lg transition ${
+                  categoryFilter === 'HORMONAL_SYSTEMIC'
+                    ? 'bg-teal-700 text-white'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                הורמונלי סיסטמי ({hormonalCount})
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setCategoryFilter('NON_HORMONAL_SYSTEMIC')}
@@ -239,13 +299,13 @@ export const Stage2View: React.FC<Stage2ViewProps> = ({
                   : 'text-slate-600 hover:bg-slate-100'
               }`}
             >
-              לא-הורמונלי ({recs.rankedOptions.filter((o) => o.category === 'NON_HORMONAL_SYSTEMIC').length})
+              לא-הורמונלי ({nonHormonalCount})
             </button>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {visibleOptions.map((opt, idx) => {
+          {visibleOptions.map((opt) => {
             const isSelected = currentPlan.selectedPrimaryOptionId === opt.id;
             const badge = badgeStyles[opt.suitabilityBadge];
             const globalRank = recs.rankedOptions.findIndex((o) => o.id === opt.id) + 1;
@@ -256,17 +316,14 @@ export const Stage2View: React.FC<Stage2ViewProps> = ({
                 className={`rounded-2xl border p-5 flex flex-col justify-between transition bg-white ${
                   isSelected
                     ? 'border-teal-600 ring-2 ring-teal-500/40 shadow-md'
-                    : opt.suitabilityBadge === 'CONTRAINDICATED_FOR_PATIENT'
-                    ? 'border-rose-200 opacity-80'
                     : 'border-slate-200 hover:border-teal-300 shadow-sm'
                 }`}
               >
                 <div className="space-y-3">
-                  {/* כותרת, דירוג ותגית התאמה */}
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="px-2 py-0.5 rounded-lg bg-slate-900 text-white text-xs font-extrabold">
-                        דירוג #{globalRank} (ציון {opt.rankScore})
+                        דירוג #{globalRank} (התאמה {opt.rankScore}%)
                       </span>
                       <span
                         className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
@@ -288,7 +345,6 @@ export const Stage2View: React.FC<Stage2ViewProps> = ({
                     <p className="text-xs text-slate-500 mt-0.5">{opt.subtitleHebrew}</p>
                   </div>
 
-                  {/* תכשירים ומינון בישראל */}
                   <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-1">
                     <div>
                       <strong className="text-slate-800">תכשיר עיקרי: </strong>
@@ -307,17 +363,15 @@ export const Stage2View: React.FC<Stage2ViewProps> = ({
                     </div>
                   </div>
 
-                  {/* התאמות אישיות ספציפיות למטופלת */}
                   {opt.tailoredMatchReasons.length > 0 && (
                     <div className="p-2.5 rounded-xl bg-teal-50/60 border border-teal-200 text-[11px] text-teal-950 space-y-1">
-                      <div className="font-bold">מדוע דורג כך עבור מטופלת זו:</div>
+                      <div className="font-bold">מדוע מתאים למטופלת זו:</div>
                       {opt.tailoredMatchReasons.map((m, i) => (
                         <p key={i}>✓ {m}</p>
                       ))}
                     </div>
                   )}
 
-                  {/* יתרונות וחסרונות */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-[11px]">
                     <div className="p-2.5 rounded-xl bg-emerald-50/50 border border-emerald-200 space-y-1">
                       <div className="font-bold text-emerald-900 flex items-center gap-1">
@@ -344,7 +398,6 @@ export const Stage2View: React.FC<Stage2ViewProps> = ({
                   </div>
                 </div>
 
-                {/* כפתור בחירה באופציה זו */}
                 <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between gap-2">
                   {opt.monitoringNotesHebrew ? (
                     <span className="text-[10px] text-slate-500 flex-1">{opt.monitoringNotesHebrew}</span>
@@ -361,7 +414,7 @@ export const Stage2View: React.FC<Stage2ViewProps> = ({
                     }`}
                   >
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>{isSelected ? 'אופציה זו נבחרה כטיפול' : 'בחר באופציה זו'}</span>
+                    <span>{isSelected ? 'אופציה זו נבחרה כטיפול ✓' : 'בחר באופציה זו'}</span>
                   </button>
                 </div>
               </div>
@@ -370,38 +423,62 @@ export const Stage2View: React.FC<Stage2ViewProps> = ({
         </div>
       </section>
 
-      {/* 3. טיפולים מקומיים משלימים ל-GSM (יובש/שתן) וטסטוסטרון ל-HSDD */}
+      {/* 3א. שילוב טיפול מקומי לתסמונת אורו-גניטלית (GSM) – בחירה מרובה (תכשירי לחות מופרדים מאינטררוזה!) */}
       <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-3">
-        <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-          <ShieldCheck className="w-4 h-4 text-teal-600" />
-          <span>שילוב טיפול מקומי ל-GSM (יובש נרתיקי / שתן) וטסטוסטרון ל-HSDD (ניתן לשלב עם כל אופציה לעיל)</span>
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-          {recs.localAndAdjunctOptions.map((loc) => {
-            const isGsmSelected =
-              loc.domain === 'GSM_VAGINAL' && currentPlan.selectedGsmOptionId === loc.id;
-            const isTestoSelected =
-              loc.domain === 'HSDD_TESTOSTERONE' && Boolean(currentPlan.includeTestosterone);
-            const active = isGsmSelected || isTestoSelected;
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-teal-600" />
+              <span>טיפול מקומי משלים לתסמונת אורו-גניטלית (GSM – יובש נרתיקי, כאב ביחסים ושתן)</span>
+            </h3>
+            <p className="text-[11px] text-slate-500">
+              ניתן לבחור <strong>מספר תוספות מקומיות במקביל</strong> (למשל שילוב אסטרוגן נרתיקי או אינטררוזה יחד עם תכשירי לחות וחומרי סיכה)
+            </p>
+          </div>
+          {currentPlan.selectedGsmOptionIds.length > 0 && (
+            <span className="text-xs font-bold bg-teal-50 text-teal-800 border border-teal-200 px-3 py-1 rounded-full">
+              נבחרו {currentPlan.selectedGsmOptionIds.length} תוספות מקומיות
+            </span>
+          )}
+        </div>
 
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+          {recs.localGsmOptions.map((loc) => {
+            const active = currentPlan.selectedGsmOptionIds.includes(loc.id);
             return (
               <div
                 key={loc.id}
-                className={`p-3.5 rounded-xl border flex flex-col justify-between ${
-                  active ? 'bg-teal-50/50 border-teal-500' : 'bg-slate-50/60 border-slate-200'
+                className={`p-4 rounded-xl border flex flex-col justify-between transition ${
+                  active ? 'bg-teal-50/60 border-teal-500 ring-1 ring-teal-400' : 'bg-slate-50/60 border-slate-200'
                 }`}
               >
                 <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-800">{loc.titleHebrew}</span>
-                    {loc.recommended && (
-                      <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
-                        מומלץ לפי תסמינים
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-bold text-slate-900">{loc.titleHebrew}</span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <span
+                        className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                          loc.isHormonal
+                            ? 'bg-teal-100 text-teal-800'
+                            : 'bg-indigo-100 text-indigo-800'
+                        }`}
+                      >
+                        {loc.isHormonal ? 'הורמונלי מקומי' : 'לא-הורמונלי'}
                       </span>
-                    )}
+                      {loc.recommended && (
+                        <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
+                          מומלץ לתסמיניה
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <p className="text-[11px] text-teal-900 font-semibold">{loc.brandAndDoseHebrew}</p>
                   <p className="text-[11px] text-slate-600">{loc.scheduleHebrew}</p>
+                  {loc.prosHebrew.map((pr, i) => (
+                    <p key={i} className="text-[11px] text-slate-700">
+                      ✓ {pr}
+                    </p>
+                  ))}
                   {loc.cautionsHebrew.map((c, i) => (
                     <p key={i} className="text-[10px] text-amber-800">
                       • {c}
@@ -410,34 +487,101 @@ export const Stage2View: React.FC<Stage2ViewProps> = ({
                 </div>
                 <button
                   type="button"
-                  onClick={() => {
-                    if (loc.domain === 'GSM_VAGINAL') {
-                      onSelectPlan({
-                        ...currentPlan,
-                        selectedGsmOptionId: isGsmSelected ? undefined : loc.id,
-                        selectedAtIso: new Date().toISOString()
-                      });
-                    } else {
-                      onSelectPlan({
-                        ...currentPlan,
-                        includeTestosterone: !isTestoSelected,
-                        selectedAtIso: new Date().toISOString()
-                      });
-                    }
-                  }}
-                  className={`mt-3 py-1.5 px-3 rounded-lg font-bold text-xs border transition ${
+                  onClick={() => toggleLocalGsmOption(loc.id)}
+                  className={`mt-3 py-2 px-3 rounded-xl font-bold text-xs border transition ${
                     active
                       ? 'bg-teal-700 text-white border-teal-700'
                       : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
                   }`}
                 >
-                  {active ? 'משולב בתוכנית הטיפול ✓' : 'שלב בתוכנית הטיפול'}
+                  {active ? 'משולב בתוכנית הטיפול ✓ (לחצי להסרה)' : '+ הוסף לתוכנית הטיפול (ניתן לשלב)'}
                 </button>
               </div>
             );
           })}
         </div>
       </section>
+
+      {/* 3ב. סקשן מופרד לחלוטין: טיפול בטסטוסטרון עורי נשי עבור HSDD */}
+      {recs.testosteroneOption && (
+        <section className="bg-white rounded-2xl border border-rose-200 shadow-sm p-5 space-y-3 text-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-rose-100 pb-3">
+            <div className="flex items-center gap-2">
+              <Flame className="w-5 h-5 text-rose-600" />
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">
+                  טיפול ייעודי בחשק מיני ירוד הגורם מצוקה (HSDD) – מופרד מהטיפול המקומי ב-GSM
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  טסטוסטרון סיסטמי עורי במינון נשי פיזיולוגי (בהתאם לקונצנזוס הבינלאומי ו-BMS)
+                </p>
+              </div>
+            </div>
+            {recs.testosteroneOption.recommended && (
+              <span className="text-[11px] bg-rose-100 text-rose-900 border border-rose-200 px-2.5 py-1 rounded-full font-bold self-start">
+                רלוונטי לתלונת ירידה בתשוקה שדווחה בשאלון IMS
+              </span>
+            )}
+          </div>
+
+          <div
+            className={`p-4 rounded-2xl border transition ${
+              currentPlan.includeTestosterone
+                ? 'bg-rose-50/60 border-rose-500 ring-1 ring-rose-400'
+                : 'bg-slate-50/70 border-slate-200'
+            }`}
+          >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <div className="font-extrabold text-slate-900 text-sm">
+                  {recs.testosteroneOption.titleHebrew}
+                </div>
+                <p className="text-rose-900 font-semibold">{recs.testosteroneOption.brandAndDoseHebrew}</p>
+                <p className="text-slate-700">{recs.testosteroneOption.scheduleHebrew}</p>
+                <div className="pt-1">
+                  <strong className="text-slate-800">תנאי קדם קליניים:</strong>
+                  {recs.testosteroneOption.prerequisitesHebrew.map((pre, i) => (
+                    <p key={i} className="text-[11px] text-slate-700">
+                      • {pre}
+                    </p>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2 flex flex-col justify-between">
+                <div className="bg-white p-3 rounded-xl border border-rose-100 space-y-1">
+                  <strong className="text-slate-800">פרוטוקול ניטור מעבדה מחייב:</strong>
+                  {recs.testosteroneOption.monitoringProtocolHebrew.map((m, i) => (
+                    <p key={i} className="text-[11px] text-slate-700">
+                      • {m}
+                    </p>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    onSelectPlan({
+                      ...currentPlan,
+                      includeTestosterone: !currentPlan.includeTestosterone,
+                      selectedAtIso: new Date().toISOString()
+                    })
+                  }
+                  className={`py-2.5 px-4 rounded-xl font-bold text-xs border transition ${
+                    currentPlan.includeTestosterone
+                      ? 'bg-rose-700 text-white border-rose-700'
+                      : 'bg-white text-rose-900 border-rose-300 hover:bg-rose-50'
+                  }`}
+                >
+                  {currentPlan.includeTestosterone
+                    ? 'טסטוסטרון עורי נשי משולב בתוכנית ✓ (לחצי להסרה)'
+                    : '+ הוסף טסטוסטרון עורי נשי לתוכנית הטיפול'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* 4. תיעוד האופציה שנבחרה ומדוע + הערות רופא/ה מתוארכות במלל חופשי */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -447,7 +591,7 @@ export const Stage2View: React.FC<Stage2ViewProps> = ({
             <div>
               <h3 className="text-sm font-bold text-slate-900">תיעוד האופציה שנבחרה ומדוע (Shared Decision-Making)</h3>
               <p className="text-[11px] text-slate-500">
-                מתעד בתיק ובסיכום ה-EMR איזה טיפול נבחר ומה היו השיקולים הקליניים והעדפת המטופלת
+                מתעד ברשומה הרפואית איזה טיפול נבחר ומה היו השיקולים הקליניים והעדפת המטופלת
               </p>
             </div>
           </div>
@@ -493,10 +637,10 @@ export const Stage2View: React.FC<Stage2ViewProps> = ({
 
           <div>
             <label className="block font-bold text-slate-700 mb-1">
-              נימוק חופשי לבחירת הטיפול והתאמות מינון ספציפיות (מדוע נבחרה אופציה זו?):
+              נימוק חופשי לבחירת הטיפול (מדוע נבחרה אופציה זו?):
             </label>
             <textarea
-              rows={3}
+              rows={2}
               value={currentPlan.selectionRationaleFreeText}
               onChange={(e) =>
                 onSelectPlan({
@@ -505,19 +649,19 @@ export const Stage2View: React.FC<Stage2ViewProps> = ({
                   selectedAtIso: new Date().toISOString()
                 })
               }
-              placeholder="למשל: הוסברו יתרונות וחסרונות פומי מול ג׳ל ומדבקה; המטופלת בחרה בג׳ל אסטרוג׳ל + אוטרוגסטן בערב בשל הפרעות שינה קשות ורצון להימנע מדבק מדבקה..."
+              placeholder="למשל: הוסברו האפשרויות המתאימות; המטופלת בחרה בג׳ל + אוטרוגסטן בערב בשל הפרעות שינה קשות..."
               className="w-full p-2.5 border border-slate-300 rounded-xl"
             />
           </div>
         </section>
 
-        {/* הערות במלל חופשי בשלב 2 כולל תאריך ושעה */}
+        {/* הערות פנימיות לרופא/ה במלל חופשי בשלב 2 כולל תאריך ושעה */}
         <section className="lg:col-span-5 bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4 text-xs">
           <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
             <MessageSquarePlus className="w-5 h-5 text-teal-600" />
             <div>
-              <h3 className="text-sm font-bold text-slate-900">הערות רופא/ה במלל חופשי (כולל תיעוד תאריך)</h3>
-              <p className="text-[11px] text-slate-500">כל הערה נשמרת אוטומטית עם חותמת תאריך ושעה מדויקת</p>
+              <h3 className="text-sm font-bold text-slate-900">יומן הערות לרופא/ה במלל חופשי (כולל תאריך)</h3>
+              <p className="text-[11px] text-slate-500">נשמר בתיק המטופלת עם חותמת תאריך ושעה אוטומטית</p>
             </div>
           </div>
 
@@ -526,7 +670,7 @@ export const Stage2View: React.FC<Stage2ViewProps> = ({
               rows={2}
               value={noteInput}
               onChange={(e) => setNoteInput(e.target.value)}
-              placeholder="הוסף/י הערה קלינית לשלב הגדרת הטיפול..."
+              placeholder="הוסף/י הערה קלינית לתיק הרפואי..."
               className="w-full p-2.5 border border-slate-300 rounded-xl"
             />
             <button
@@ -538,7 +682,7 @@ export const Stage2View: React.FC<Stage2ViewProps> = ({
             </button>
           </div>
 
-          <div className="space-y-2 max-h-52 overflow-y-auto">
+          <div className="space-y-2 max-h-48 overflow-y-auto">
             {stage2Notes.length === 0 ? (
               <p className="text-slate-400 text-center py-4">טרם נוספו הערות מתוארכות בשלב 2.</p>
             ) : (
@@ -568,20 +712,40 @@ export const Stage2View: React.FC<Stage2ViewProps> = ({
         </section>
       </div>
 
-      {/* 5. ארסנל התכשירים המלא בישראל (הורמונלי + לא-הורמונלי + מקומי) לחיפוש מהיר */}
+      {/* 5. פלט הנחיות למטופלת לשלב 2: הנחיות לדרך הטיפול + מלל חופשי מהרופאה */}
+      <PatientOutputCard
+        output={stage2PatientOutput}
+        freeTextValue={currentPlan.stage2PatientInstructionsFreeText || ''}
+        onFreeTextChange={(val) =>
+          onSelectPlan({
+            ...currentPlan,
+            stage2PatientInstructionsFreeText: val,
+            selectedAtIso: new Date().toISOString()
+          })
+        }
+        onPrint={onPrintPatientLeaflet}
+        freeTextPlaceholder="כתבי כאן הנחיות אישיות למטופלת לגבי אופן התחלת הטיפול, טיטרציה או תיאום בדיקות..."
+      />
+
+      {/* 6. מדריך התכשירים המתאימים למטופלת בישראל (מסונן מתרופות שנפסלו!) */}
       <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Pill className="w-5 h-5 text-teal-600" />
-            <h3 className="text-sm font-bold text-slate-800">
-              מדריך תכשירים ומינונים זמינים בישראל (כולל חוק הפרופורציונליות וניטור כבד בויוזה)
-            </h3>
+            <div>
+              <h3 className="text-sm font-bold text-slate-800">
+                טבלת תכשירים ומינונים מתאימים למטופלת בישראל ({filteredArsenal.length} תכשירים מאושרים לפרופיל שלה)
+              </h3>
+              <p className="text-[11px] text-slate-500">
+                תכשירים שנפסלו בשל התוויות נגד, רגישויות, אינטראקציות או כישלון קודם הוסרו אוטומטית מהטבלה
+              </p>
+            </div>
           </div>
           <div className="relative sm:w-72">
             <Search className="w-4 h-4 text-slate-400 absolute right-3 top-2.5" />
             <input
               type="text"
-              placeholder="חפש תכשיר (למשל ויוזה, אוטרוגסטן, אסטרוג׳ל)..."
+              placeholder="חפש מתוך התכשירים המתאימים..."
               value={arsenalQuery}
               onChange={(e) => setArsenalQuery(e.target.value)}
               className="w-full pr-9 pl-3 py-1.5 text-xs border border-slate-300 rounded-xl"
@@ -596,7 +760,7 @@ export const Stage2View: React.FC<Stage2ViewProps> = ({
                 <th className="p-2.5 font-bold">שם תכשיר</th>
                 <th className="p-2.5 font-bold">הרכב ומינון נטילה</th>
                 <th className="p-2.5 font-bold">יתרונות קליניים</th>
-                <th className="p-2.5 font-bold">דגשים והתוויות נגד</th>
+                <th className="p-2.5 font-bold">דגשים</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -616,7 +780,7 @@ export const Stage2View: React.FC<Stage2ViewProps> = ({
                     )}
                   </td>
                   <td className="p-2.5 align-top text-slate-700">{drug.clinicalAdvantages}</td>
-                  <td className="p-2.5 align-top text-rose-900/90">{drug.cautionsAndContraindications}</td>
+                  <td className="p-2.5 align-top text-slate-600">{drug.cautionsAndContraindications}</td>
                 </tr>
               ))}
             </tbody>

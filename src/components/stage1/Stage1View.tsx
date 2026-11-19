@@ -35,6 +35,7 @@ import {
   getSymptomEntry,
   summarizeSymptoms
 } from '../../clinical-engine/imsSymptoms';
+import { buildStage1PatientInstructions } from '../../clinical-engine/patientInstructionsBuilder';
 import {
   calculateAhaPreventRisk,
   calculateBoneRisk,
@@ -52,6 +53,7 @@ import {
   ScreeningStatus,
   Stage1Data
 } from '../../clinical-engine/types';
+import { PatientOutputCard } from '../common/PatientOutputCard';
 
 interface Stage1ViewProps {
   data: Stage1Data;
@@ -113,6 +115,7 @@ export const Stage1View: React.FC<Stage1ViewProps> = ({
   const boneRisk = calculateBoneRisk(data);
   const interactions = checkDrugInteractions(data);
   const gate = evaluateCompletenessGate(data);
+  const stage1PatientOutput = buildStage1PatientInstructions(data);
 
   // עוזרי עדכון מקוננים
   const updateMedical = (patch: Partial<MedicalHistoryHierarchical>) => {
@@ -125,7 +128,7 @@ export const Stage1View: React.FC<Stage1ViewProps> = ({
 
   const handleWeightHeightChange = (weightKg: number, heightCm: number) => {
     const heightM = heightCm > 0 ? heightCm / 100 : 1.64;
-    const bmi = weightKg > 0 ? Number((weightKg / (heightM * heightM)).toFixed(1)) : 0;
+    const bmi = weightKg > 0 && heightCm > 0 ? Number((weightKg / (heightM * heightM)).toFixed(1)) : 0;
     onChange({ weightKg, heightCm, bmi });
   };
 
@@ -184,7 +187,7 @@ export const Stage1View: React.FC<Stage1ViewProps> = ({
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-      {/* סרגל ניווט מהיר בין 9 פרקי שלב 1 */}
+      {/* סרגל ניווט מהיר בין פרקי שלב 1 */}
       <div className="bg-white border border-slate-200 rounded-2xl p-2.5 mb-5 shadow-sm flex flex-wrap items-center gap-1.5 text-[11px] font-semibold">
         <span className="text-slate-400 px-2">קפיצה מהירה:</span>
         {[
@@ -196,7 +199,8 @@ export const Stage1View: React.FC<Stage1ViewProps> = ({
           { href: '#sec-family', label: '6. משפחה וגנטיקה' },
           { href: '#sec-prevent', label: '7. מחשבון PREVENT וסיכונים' },
           { href: '#sec-preferences', label: '8. העדפות וטיפולי עבר' },
-          { href: '#sec-screening', label: '9. בדיקות סקר ומעבדה' }
+          { href: '#sec-screening', label: '9. בדיקות סקר ומעבדה' },
+          { href: '#sec-stage1-output', label: '10. פלט הנחיות למטופלת' }
         ].map((nav) => (
           <a
             key={nav.href}
@@ -209,7 +213,7 @@ export const Stage1View: React.FC<Stage1ViewProps> = ({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* עמודה ראשית: 9 פרקי איסוף הנתונים (8 עמודות) */}
+        {/* עמודה ראשית: פרקי איסוף הנתונים ופלט למטופלת (8 עמודות) */}
         <div className="lg:col-span-8 space-y-6">
           {/* ================================================================= */}
           {/* סעיף 1: דמוגרפיה, מדדים ואורח חיים */}
@@ -334,7 +338,8 @@ export const Stage1View: React.FC<Stage1ViewProps> = ({
                 <input
                   type="number"
                   min={0}
-                  value={data.alcoholUnitsPerWeek}
+                  placeholder="0"
+                  value={data.alcoholUnitsPerWeek || ''}
                   onChange={(e) => onChange({ alcoholUnitsPerWeek: Number(e.target.value) })}
                   className="w-full p-2 border border-slate-300 rounded-lg"
                 />
@@ -452,7 +457,8 @@ export const Stage1View: React.FC<Stage1ViewProps> = ({
                   <input
                     type="number"
                     min={0}
-                    value={data.monthsSinceLastPeriod}
+                    placeholder="0"
+                    value={data.monthsSinceLastPeriod || ''}
                     onChange={(e) => onChange({ monthsSinceLastPeriod: Number(e.target.value) })}
                     className="w-full p-2 border border-slate-300 rounded-lg"
                   />
@@ -2426,6 +2432,19 @@ export const Stage1View: React.FC<Stage1ViewProps> = ({
               onChange={(val) => onChange({ screeningLabsNotes: val })}
             />
           </section>
+
+          {/* ================================================================= */}
+          {/* סעיף 10: פלט הנחיות למטופלת בשלב 1 – בדיקות להשלמה + מלל חופשי מהרופאה */}
+          {/* ================================================================= */}
+          <div id="sec-stage1-output">
+            <PatientOutputCard
+              output={stage1PatientOutput}
+              freeTextValue={data.stage1PatientInstructionsFreeText || ''}
+              onFreeTextChange={(val) => onChange({ stage1PatientInstructionsFreeText: val })}
+              onPrint={onPrintPatientInstructions}
+              freeTextPlaceholder="הוסיפי כאן הנחיות אישיות למטופלת לקראת השלמת הבדיקות (למשל: לבצע בדיקת דם בצום של 12 שעות, להגיע עם תשובת ממוגרפיה מודפסת)..."
+            />
+          </div>
         </div>
 
         {/* ================================================================= */}
@@ -2591,16 +2610,14 @@ export const Stage1View: React.FC<Stage1ViewProps> = ({
                 <ArrowLeft className="w-4 h-4" />
               </button>
 
-              {gate.patientInstructions.length > 0 && (
-                <button
-                  type="button"
-                  onClick={onPrintPatientInstructions}
-                  className="w-full py-2 px-3 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 font-semibold flex items-center justify-center gap-1.5"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>הדפס דף השלמת בדיקות למטופלת</span>
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={onPrintPatientInstructions}
+                className="w-full py-2 px-3 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 font-semibold flex items-center justify-center gap-1.5"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span>הדפס דף הנחיות ובדיקות למטופלת</span>
+              </button>
             </div>
           </div>
         </aside>

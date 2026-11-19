@@ -12,7 +12,7 @@ import {
   X
 } from 'lucide-react';
 import { evaluateCompletenessGate } from '../../clinical-engine/completenessGate';
-import { ISRAELI_DRUG_ARSENAL } from '../../clinical-engine/data/drugArsenal';
+import { getEligibleArsenalForPatient } from '../../clinical-engine/data/drugArsenal';
 import { checkDrugInteractions } from '../../clinical-engine/drugInteractions';
 import { summarizeSymptoms } from '../../clinical-engine/imsSymptoms';
 import {
@@ -412,7 +412,10 @@ export const ModuleHModal: React.FC<ModuleHModalProps> = ({ isOpen, onClose, rec
           {/* ================================================================= */}
           {activeTab === 'ISRAELI_ARSENAL' && (
             <div className="space-y-2">
-              {ISRAELI_DRUG_ARSENAL.map((d) => {
+              <div className="p-2.5 rounded-xl bg-teal-50 border border-teal-200 text-teal-950 font-semibold">
+                מוצגים אך ורק תכשירים המתאימים לפרופיל הבטיחותי של {p.fullName || 'המטופלת'} (תכשירים שנפסלו עבורה סוננו אוטומטית).
+              </div>
+              {getEligibleArsenalForPatient(p).map((d) => {
                 const relevantToChosen =
                   chosenOption &&
                   (chosenOption.israeliProductsSummary.primaryAgent

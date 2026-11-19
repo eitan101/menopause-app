@@ -232,6 +232,12 @@ menopause-app/
 │   ├── markdown/                 # שכבה 2: גרסאות Markdown מלאות ונאמנות למקור (1:1 מול sources)
 │   └── summaries/                # שכבה 3: אינדקס ראשי (INDEX.md) ו-10 סיכומי נושאים קליניים
 │
+├── docs/
+│   └── TEST_SPECIFICATION.md     # מפרט 10 תרחישי בדיקה מערכתיים עם קישוריות דו-כיוונית לקוד ולמקורות הידע
+│
+├── tests/
+│   └── systemScenarios.test.ts   # מימוש אוטומטי של 10 תרחישי המערכת (מורץ באמצעות npm test וב-CI)
+│
 ├── index.html                    # נקודת הכניסה הראשית (Vite + ניתוב אוטומטי ל-standalone בפתיחה מקומית)
 ├── standalone.html               # קובץ יחיד מהודר אוטומטית מ-src/ להרצה מיידית ללא שרת
 ├── package.json
@@ -240,11 +246,11 @@ menopause-app/
 
 ---
 
-## 🚀 מדריך פריסה והפעלה ב-GitHub Pages או מקומית
+## 🚀 מדריך בדיקות, פריסה והפעלה ב-GitHub Pages או מקומית
 
-תהליך הפריסה ל-GitHub Pages מוגדר אוטומטית ב-[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml):
-1. במאגר ב-GitHub: כניסה ל-**Settings** ⬅️ **Pages**.
-2. תחת **Build and deployment** ⬅️ **Source**: בחירה ב-**GitHub Actions**.
-3. כל `git push` לענף הראשי (`main`) יפעיל את `npm run build` והאפליקציה תיפרס אוטומטית לכתובת:
+תהליך הבדיקות והפריסה מוגדר אוטומטית ב-[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml):
+1. **הרצת מערך בדיקות המערכת (10 תרחישים קליניים + בדיקת עקיבות דו-כיוונית למפרט [`docs/TEST_SPECIFICATION.md`](docs/TEST_SPECIFICATION.md)):**
+   `npm test`
+2. **פריסה אוטומטית ל-GitHub Pages:** כל `git push` לענף הראשי (`main`) מריץ אוטומטית את `npm test` ואת `npm run build` ומעדכן את האתר החי בכתובת:
    `https://eitan101.github.io/menopause-app/`
-4. **הרצה מקומית במרפאה ללא התקנות:** ניתן לפתוח ישירות את [`standalone.html`](standalone.html) (או [`index.html`](index.html)) בכל דפדפן, או להריץ שרת פיתוח מקומי באמצעות `npm install && npm run dev`.
+3. **הרצה מקומית במרפאה ללא התקנות:** ניתן לפתוח ישירות את [`standalone.html`](standalone.html) (או [`index.html`](index.html)) בכל דפדפן, או להריץ שרת פיתוח מקומי באמצעות `npm install && npm run dev`.

@@ -200,13 +200,13 @@ export interface FamilyHistoryData {
 export interface PriorFailedTreatment {
   id: string;
   treatmentKey:
-    | 'ORAL_COMBINED_NETA'     // אקטיבל / אוויאנה / נובופם
-    | 'ORAL_FEMOSTON'          // פמוסטון
-    | 'EVOREL_PATCH'           // מדבקות אוורל / אוורל קונטי
+    | 'ORAL_COMBINED_NETA'     // אקטיבל / אוויאנה / נובופם / אנג'ליק
+    | 'ORAL_FEMOSTON'          // פמוסטון / פמוסטון קונטי
+    | 'EVOREL_PATCH'           // מדבקות אוורל / אוורל קונטי / סקווי
     | 'ESTROGEL_SANDRENA'      // ג'ל אסטרוג'ל / סנדרנה
     | 'UTROGESTAN_ORAL'        // אוטרוגסטן פומי
     | 'MIRENA_IUS'             // מירנה
-    | 'VEOZA_NK3'              // ויוזה
+    | 'VEOZA_NK3'              // ויוזה / לינקואט
     | 'SSRI_SNRI'              // ונלפקסין / SSRI
     | 'OTHER';
   customName: string;
@@ -315,6 +315,9 @@ export interface Stage1Data {
   fshLevel?: number;
   estradiolSerumLevel?: number;
   screeningLabsNotes: string;
+
+  // פלט שלב 1 למטופלת – מלל חופשי מהרופא/ה בנוסף לבדיקות להשלמה
+  stage1PatientInstructionsFreeText: string;
 }
 
 export interface EndometrialRiskAssessment {
@@ -371,11 +374,20 @@ export type RoutePreference =
 
 export type EstrogenDoseTier = 'ULTRA_LOW' | 'LOW' | 'STANDARD' | 'MODERATE_HIGH_PHYSIOLOGIC';
 
+export type FollowUpMedicationAction =
+  | 'CONTINUE_SAME'
+  | 'ESCALATE_DOSE'
+  | 'REDUCE_DOSE'
+  | 'SWITCH_DRUG_OR_ROUTE'
+  | 'ADD_LOCAL_TREATMENT'
+  | 'TAPER_OR_STOP';
+
 export interface TreatmentOptionCard {
   id: string;
   category: 'HORMONAL_SYSTEMIC' | 'NON_HORMONAL_SYSTEMIC';
-  rankScore: number; // 0-100 לדירוג מותאם אישית
-  suitabilityBadge: 'RECOMMENDED_TOP' | 'GOOD_ALTERNATIVE' | 'CONDITIONAL' | 'CONTRAINDICATED_FOR_PATIENT';
+  rankScore: number; // 0-100 לדירוג מותאם אישית (מוצגות אך ורק אפשרויות מתאימות שלא נפסלו!)
+  suitabilityBadge: 'RECOMMENDED_TOP' | 'GOOD_ALTERNATIVE' | 'CONDITIONAL';
+  followUpActionType?: FollowUpMedicationAction;
   titleHebrew: string;
   subtitleHebrew: string;
   routeLabelHebrew: string;
@@ -388,26 +400,45 @@ export interface TreatmentOptionCard {
   prosHebrew: string[];
   consHebrew: string[];
   tailoredMatchReasons: string[];
+  patientHowToTakeHebrew: string[];
   monitoringNotesHebrew?: string;
 }
 
-export interface LocalOrAdjunctOption {
-  id: string;
-  domain: 'GSM_VAGINAL' | 'HSDD_TESTOSTERONE';
+export interface LocalGsmOption {
+  id:
+    | 'gsm_moisturizers_lubricants'
+    | 'gsm_vaginal_estrogen'
+    | 'gsm_intrarosa_prasterone'
+    | 'gsm_ospemifene_oral';
   recommended: boolean;
+  isHormonal: boolean;
   titleHebrew: string;
   brandAndDoseHebrew: string;
   scheduleHebrew: string;
   prosHebrew: string[];
   cautionsHebrew: string[];
+  patientInstructionsHebrew: string;
+}
+
+export interface TestosteroneHsddOption {
+  id: 'hsdd_transdermal_testosterone';
+  recommended: boolean;
+  titleHebrew: string;
+  brandAndDoseHebrew: string;
+  scheduleHebrew: string;
+  prerequisitesHebrew: string[];
+  prosHebrew: string[];
+  monitoringProtocolHebrew: string[];
+  patientInstructionsHebrew: string;
 }
 
 export interface SelectedTreatmentPlan {
   selectedPrimaryOptionId: string;
-  selectedGsmOptionId?: string;
-  includeTestosterone?: boolean;
+  selectedGsmOptionIds: string[]; // בחירה מרובה של תוספות מקומיות (למשל וגיפם + תכשירי לחות!)
+  includeTestosterone: boolean;   // מופרד לחלוטין מטיפול מקומי ל-GSM
   selectionRationaleTags: string[];
   selectionRationaleFreeText: string;
+  stage2PatientInstructionsFreeText: string;
   selectedAtIso: string;
   customRegimenOverrideText?: string;
 }
@@ -419,20 +450,26 @@ export interface Stage2Recommendations {
   estrogenDoseTierReasonHebrew: string;
   routePreference: RoutePreference;
   routeRationale: string[];
-  rankedOptions: TreatmentOptionCard[];
-  localAndAdjunctOptions: LocalOrAdjunctOption[];
+  rankedOptions: TreatmentOptionCard[];         // אך ורק אפשרויות מתאימות ובטוחות למטופלת!
+  excludedReasonsAudit: string[];               // תיעוד שקיפות מנוע למה סוננו תרופות שנפסלו
+  localGsmOptions: LocalGsmOption[];            // תכשירי לחות מופרדים מאינטררוזה, אוספמיפן ואסטרוגן נרתיקי
+  testosteroneOption?: TestosteroneHsddOption;  // מופרד לחלוטין מ-GSM (מוצג רק אם מותר למטופלת)
   patientExpectationPoints: string[];
   followUpIntervalMonths: number;
   emrSummaryText: string;
 }
 
-export type FollowUpMedicationAction =
-  | 'CONTINUE_SAME'
-  | 'ESCALATE_DOSE'
-  | 'REDUCE_DOSE'
-  | 'SWITCH_DRUG_OR_ROUTE'
-  | 'ADD_LOCAL_TREATMENT'
-  | 'TAPER_OR_STOP';
+export interface BmsEndometrialCalculatorOverrides {
+  unopposedOrInsufficientProgestogen?: boolean;
+  sequentialHrtOver5YearsAgeOver45?: boolean;
+  lynchOrCowdenSyndrome?: boolean;
+  bmiOver40?: boolean;
+  atypicalHyperplasiaHistory?: boolean;
+  tamoxifenUse?: boolean;
+  bmi30To39?: boolean;
+  diabetesOrInsulinResistance?: boolean;
+  pcosOrChronicAnovulation?: boolean;
+}
 
 export interface LongitudinalVisit {
   visitId: string;
@@ -461,7 +498,7 @@ export interface LongitudinalVisit {
   newContraindicationEmerged?: boolean;
   veozaAltAstNormal?: 'NOT_APPLICABLE' | 'NORMAL' | 'ELEVATED_UNDER_3X' | 'CRITICAL_OVER_3X';
 
-  // 3. תופעות לוואי ספציפיות לטיפול שניתן + דימומים
+  // 3. תופעות לוואי ספציפיות לטיפול שניתן + מחשבון BMS לדימומים ולסרטן הרחם
   reportedSideEffectIds: string[];
   sideEffectsFreeText: string;
   hasNewBleeding: boolean;
@@ -469,6 +506,7 @@ export interface LongitudinalVisit {
   hasRecentDoseChangeIn3Months: boolean;
   tvsThicknessMm?: number;
   stoppedHrt4WeeksAgoAndResolved?: boolean;
+  bmsEndometrialOverrides?: BmsEndometrialCalculatorOverrides;
 
   // פלט טריאז' דימומים ותופעות לוואי
   urgentTvsIndicated: boolean;
@@ -476,18 +514,28 @@ export interface LongitudinalVisit {
   tvsReason?: string;
   sideEffectActionPlan: string[];
 
-  // 4. שינוי תרופתי שבוצע בביקור
+  // 4. החלטה טיפולית מפורטת במעקב (באותה רמת פירוט של שלב 2!)
   medicationAction: FollowUpMedicationAction;
+  selectedFollowUpOptionId?: string;
   switchedToOptionId?: string;
+  selectedGsmOptionIds?: string[];
+  includeTestosterone?: boolean;
+  selectionRationaleTags?: string[];
+  selectionRationaleFreeText?: string;
   updatedRegimenText: string;
   cessationPlan?: string;
 
-  // 5. הערות במלל חופשי כולל תאריך
+  // 5. פלט הנחיות למטופלת למעקב + מלל חופשי מהרופא/ה
+  patientFollowUpInstructions: string[];
+  patientFollowUpInstructionsFreeText: string;
+
+  // 6. הערות פנימיות לרופא/ה במלל חופשי כולל תאריך
   timestampedNotes: TimestampedNote[];
 }
 
 export interface PatientRecord {
   version: string;
+  recordSessionId: string;
   lastUpdated: string;
   activeStage: 1 | 2 | 3;
   stage1: Stage1Data;

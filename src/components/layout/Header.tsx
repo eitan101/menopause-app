@@ -1,5 +1,5 @@
-import React from 'react';
-import { BookOpen, QrCode, Download, Upload, RotateCcw, ShieldCheck } from 'lucide-react';
+import React, { useState } from 'react';
+import { BookOpen, Download, QrCode, RotateCcw, ShieldCheck, Upload } from 'lucide-react';
 import { PatientRecord } from '../../clinical-engine/types';
 
 interface HeaderProps {
@@ -20,6 +20,7 @@ export const Header: React.FC<HeaderProps> = ({
   onResetPatient
 }) => {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [confirmingReset, setConfirmingReset] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -40,9 +41,7 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold tracking-tight text-white">
-                  ניהול גיל המעבר
-                </h1>
+                <h1 className="text-xl font-bold tracking-tight text-white">ניהול גיל המעבר</h1>
                 <span className="text-xs bg-teal-600/80 text-teal-100 px-2 py-0.5 rounded-full font-medium border border-teal-400/30">
                   Zero-Server CDSS
                 </span>
@@ -59,15 +58,18 @@ export const Header: React.FC<HeaderProps> = ({
               <div className="bg-teal-950/60 border border-teal-500/40 px-3 py-1.5 rounded-lg text-xs">
                 <span className="text-teal-300 font-medium">מטופלת: </span>
                 <span className="font-semibold text-white">{record.stage1.fullName}</span>
-                {record.stage1.age > 0 && <span className="text-teal-200 mr-1.5">({record.stage1.age})</span>}
+                {record.stage1.age > 0 && (
+                  <span className="text-teal-200 mr-1.5">({record.stage1.age})</span>
+                )}
               </div>
             )}
 
             {/* כפתור מודול H */}
             <button
+              type="button"
               onClick={onOpenModuleH}
               className="flex items-center gap-1.5 bg-rose-600/90 hover:bg-rose-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-sm transition border border-rose-400/40"
-              title="דף עזר מהיר וטבלאות השוואת תרופות לרופא/ה"
+              title="תדריך קליני מותאם אישית למטופלת"
             >
               <BookOpen className="w-4 h-4" />
               <span>מודול H לרופא/ה</span>
@@ -75,6 +77,7 @@ export const Header: React.FC<HeaderProps> = ({
 
             {/* כפתור QR */}
             <button
+              type="button"
               onClick={onOpenQr}
               className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition border border-white/15"
               title="הצגת או סריקת קוד QR"
@@ -85,6 +88,7 @@ export const Header: React.FC<HeaderProps> = ({
 
             {/* ייצוא קובץ מוצפן */}
             <button
+              type="button"
               onClick={onExportJson}
               className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition border border-white/15"
               title="שמירת קובץ נתונים מוצפן מקומית"
@@ -102,6 +106,7 @@ export const Header: React.FC<HeaderProps> = ({
               className="hidden"
             />
             <button
+              type="button"
               onClick={() => fileInputRef.current?.click()}
               className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition border border-white/15"
               title="טעינת תיק מטופלת מקובץ מוצפן"
@@ -110,15 +115,39 @@ export const Header: React.FC<HeaderProps> = ({
               <span>טען תיק</span>
             </button>
 
-            {/* מטופלת חדשה */}
-            <button
-              onClick={onResetPatient}
-              className="flex items-center gap-1.5 bg-teal-950/80 hover:bg-teal-950 text-teal-200 hover:text-white text-xs font-medium px-2.5 py-1.5 rounded-lg transition border border-teal-800"
-              title="איפוס ופתיחת תיק מטופלת חדשה"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>חדשה</span>
-            </button>
+            {/* איפוס תיק מטופלת חדשה – אישור מובנה וניקוי מלא של 100% מהשדות */}
+            {!confirmingReset ? (
+              <button
+                type="button"
+                onClick={() => setConfirmingReset(true)}
+                className="flex items-center gap-1.5 bg-teal-950/80 hover:bg-teal-950 text-teal-200 hover:text-white text-xs font-medium px-2.5 py-1.5 rounded-lg transition border border-teal-800"
+                title="ניקוי מלא של כל השדות ופתיחת תיק מטופלת חדשה"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>חדשה (איפוס)</span>
+              </button>
+            ) : (
+              <div className="flex items-center gap-1 bg-rose-950/90 border border-rose-400 px-2 py-1 rounded-lg text-xs">
+                <span className="text-rose-100 font-semibold ml-1">לנקות הכל?</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmingReset(false);
+                    onResetPatient();
+                  }}
+                  className="bg-rose-600 hover:bg-rose-500 text-white font-bold px-2 py-0.5 rounded"
+                >
+                  כן, נקה הכל
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmingReset(false)}
+                  className="bg-white/15 hover:bg-white/25 text-white px-2 py-0.5 rounded"
+                >
+                  ביטול
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

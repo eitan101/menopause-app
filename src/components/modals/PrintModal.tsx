@@ -1,13 +1,16 @@
 import React from 'react';
 import { Printer, X } from 'lucide-react';
-import { evaluateCompletenessGate } from '../../clinical-engine/completenessGate';
+import {
+  buildStage1PatientInstructions,
+  buildStage2PatientInstructions
+} from '../../clinical-engine/patientInstructionsBuilder';
 import { formulateTreatment } from '../../clinical-engine/treatmentEngine';
 import { PatientRecord } from '../../clinical-engine/types';
 import { generateEmrSummary } from '../../services/emrExportService';
 
 interface PrintModalProps {
   isOpen: boolean;
-  type: 'PATIENT_INSTRUCTIONS' | 'PATIENT_LEAFLET' | 'EMR_SUMMARY';
+  type: 'PATIENT_INSTRUCTIONS' | 'PATIENT_LEAFLET' | 'STAGE3_FOLLOWUP' | 'EMR_SUMMARY';
   record: PatientRecord;
   onClose: () => void;
 }
@@ -16,14 +19,10 @@ export const PrintModal: React.FC<PrintModalProps> = ({ isOpen, type, record, on
   if (!isOpen) return null;
 
   const p = record.stage1;
-  const gate = evaluateCompletenessGate(p);
   const recs = record.stage2 || formulateTreatment(p);
-  const chosenOption =
-    recs.rankedOptions.find((o) => o.id === record.selectedPlan?.selectedPrimaryOptionId) ||
-    recs.rankedOptions[0];
-  const gsmOption = recs.localAndAdjunctOptions.find(
-    (l) => l.id === record.selectedPlan?.selectedGsmOptionId
-  );
+  const stage1Output = buildStage1PatientInstructions(p);
+  const stage2Output = buildStage2PatientInstructions(p, recs, record.selectedPlan);
+  const lastVisit = record.stage3Visits[record.stage3Visits.length - 1];
 
   const today = new Date().toLocaleDateString('he-IL');
 
@@ -34,9 +33,11 @@ export const PrintModal: React.FC<PrintModalProps> = ({ isOpen, type, record, on
         <div className="bg-slate-800 text-white px-6 py-4 flex items-center justify-between no-print shrink-0">
           <h3 className="text-sm font-bold">
             {type === 'PATIENT_INSTRUCTIONS'
-              ? 'דף הנחיות להשלמת בדיקות לקראת המשך בירור'
+              ? 'פלט למטופלת (שלב 1): דף בדיקות להשלמה'
               : type === 'PATIENT_LEAFLET'
-              ? 'דף הדרכה ותיאום ציפיות אישי למטופלת'
+              ? 'פלט למטופלת (שלב 2): הנחיות לדרך הטיפול שנבחר'
+              : type === 'STAGE3_FOLLOWUP'
+              ? 'פלט למטופלת (שלב 3): הנחיות למעקב והמשך טיפול'
               : 'סיכום רשומה רפואית (EMR)'}
           </h3>
           <div className="flex items-center gap-2">
@@ -57,70 +58,70 @@ export const PrintModal: React.FC<PrintModalProps> = ({ isOpen, type, record, on
         <div className="p-8 overflow-y-auto space-y-5 text-sm text-slate-800 flex-1">
           <div className="border-b-2 border-teal-700 pb-3 flex justify-between items-end">
             <div>
-              <h1 className="text-xl font-extrabold text-teal-900">מרפאת גיל המעבר – דף מידע אישי למטופלת</h1>
+              <h1 className="text-xl font-extrabold text-teal-900">מרפאת גיל המעבר – דף הנחיות אישי למטופלת</h1>
               <p className="text-xs text-slate-500 mt-0.5">
-                שם: <strong>{p.fullName || 'מטופלת'}</strong> | ת.ז: {p.patientId || '-'} | גיל: {p.age}
+                שם: <strong>{p.fullName || 'מטופלת'}</strong> | ת.ז: {p.patientId || '-'} | גיל: {p.age || '-'}
               </p>
             </div>
             <div className="text-xs text-slate-500">תאריך: {today}</div>
           </div>
 
           {type === 'PATIENT_INSTRUCTIONS' && (
-            <div className="space-y-4">
-              <p className="font-bold text-slate-900">
-                לקראת השלמת התאמת הטיפול המדויק והבטוח ביותר עבורך, מומלץ להשלים את הבדיקות הבאות:
-              </p>
-              <ul className="list-disc pr-5 space-y-2 text-xs leading-relaxed">
-                {gate.patientInstructions.length > 0 ? (
-                  gate.patientInstructions.map((inst, idx) => <li key={idx}>{inst}</li>)
-                ) : (
-                  <li>כל בדיקות הבסיס הושלמו – ניתן להמשיך בתוכנית הטיפול.</li>
-                )}
-              </ul>
+            <div className="space-y-4 text-xs leading-relaxed">
+              <h2 className="text-base font-extrabold text-slate-900">{stage1Output.titleHebrew}</h2>
+              <ol className="list-decimal pr-5 space-y-2">
+                {stage1Output.structuredBullets.map((inst, idx) => (
+                  <li key={idx}>{inst}</li>
+                ))}
+              </ol>
+              {stage1Output.physicianFreeText && (
+                <div className="p-4 rounded-xl bg-teal-50 border border-teal-200">
+                  <strong className="block text-teal-950 mb-1">דגשים והערות אישיות מהרופא/ה:</strong>
+                  <p className="whitespace-pre-wrap">{stage1Output.physicianFreeText}</p>
+                </div>
+              )}
             </div>
           )}
 
           {type === 'PATIENT_LEAFLET' && (
             <div className="space-y-4 text-xs leading-relaxed">
-              {chosenOption && (
-                <div className="p-4 rounded-2xl bg-teal-50 border border-teal-200 space-y-1.5">
-                  <div className="text-sm font-extrabold text-teal-950">תוכנית הטיפול שנבחרה יחד איתך:</div>
-                  <div className="font-bold text-slate-900">{chosenOption.titleHebrew}</div>
-                  <div>
-                    <strong>תכשיר ומינון:</strong> {chosenOption.israeliProductsSummary.primaryAgent}
-                  </div>
-                  {chosenOption.israeliProductsSummary.secondaryProgestogenOrMonitor && (
-                    <div>
-                      <strong>הגנה נלווית / מעקב:</strong>{' '}
-                      {chosenOption.israeliProductsSummary.secondaryProgestogenOrMonitor}
-                    </div>
-                  )}
-                  <div>
-                    <strong>אופן נטילה:</strong> {chosenOption.israeliProductsSummary.scheduleHebrew}
-                  </div>
-                  {gsmOption && (
-                    <div className="pt-1 border-t border-teal-200 mt-1">
-                      <strong>טיפול מקומי משולב:</strong> {gsmOption.titleHebrew} ({gsmOption.scheduleHebrew})
-                    </div>
-                  )}
+              <h2 className="text-base font-extrabold text-slate-900">{stage2Output.titleHebrew}</h2>
+              <ol className="list-decimal pr-5 space-y-2">
+                {stage2Output.structuredBullets.map((pt, idx) => (
+                  <li key={idx}>{pt}</li>
+                ))}
+              </ol>
+              {stage2Output.physicianFreeText && (
+                <div className="p-4 rounded-xl bg-teal-50 border border-teal-200">
+                  <strong className="block text-teal-950 mb-1">דגשים והנחיות אישיות מהרופא/ה:</strong>
+                  <p className="whitespace-pre-wrap">{stage2Output.physicianFreeText}</p>
                 </div>
               )}
+            </div>
+          )}
 
-              <div>
-                <h4 className="font-extrabold text-slate-900 mb-2">דגשים חשובים ותיאום ציפיות לחודשים הראשונים:</h4>
-                <ul className="list-disc pr-5 space-y-2">
-                  {recs.patientExpectationPoints.map((pt, idx) => (
-                    <li key={idx}>{pt}</li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-950">
-                <strong>מתי לפנות לבדיקה רפואית לפני מועד המעקב המתוכנן (3 חודשים)?</strong>
-                <p className="mt-1">
-                  במקרה של דימום נרתיקי כבד או ממושך, גוש או שינוי חדש בשד, כאב/נפיחות חריגה בשוק הרגל, קוצר נשימה/כאב בחזה, כאב ראש חריף חדש, או (תחת טיפול בויוזה) הופעת עייפות חריגה, בחילה ממושכת, שתן כהה או הצהבת עור/עיניים.
-                </p>
-              </div>
+          {type === 'STAGE3_FOLLOWUP' && (
+            <div className="space-y-4 text-xs leading-relaxed">
+              <h2 className="text-base font-extrabold text-slate-900">
+                פלט הנחיות למטופלת (שלב 3): הנחיות למעקב והמשך הטיפול
+              </h2>
+              {lastVisit ? (
+                <>
+                  <ol className="list-decimal pr-5 space-y-2">
+                    {lastVisit.patientFollowUpInstructions.map((pt, idx) => (
+                      <li key={idx}>{pt}</li>
+                    ))}
+                  </ol>
+                  {lastVisit.patientFollowUpInstructionsFreeText && (
+                    <div className="p-4 rounded-xl bg-teal-50 border border-teal-200">
+                      <strong className="block text-teal-950 mb-1">דגשים והנחיות אישיות מהרופא/ה:</strong>
+                      <p className="whitespace-pre-wrap">{lastVisit.patientFollowUpInstructionsFreeText}</p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p>יש לשמור תחילה את ביקור המעקב להדפסת דף ההנחיות המעודכן (או להשתמש בכפתור ההעתקה המיידי).</p>
+              )}
             </div>
           )}
 

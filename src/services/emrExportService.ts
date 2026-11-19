@@ -2,6 +2,7 @@ import { checkDrugInteractions } from '../clinical-engine/drugInteractions';
 import { summarizeSymptoms } from '../clinical-engine/imsSymptoms';
 import { calculateAhaPreventRisk, calculateVteRisk } from '../clinical-engine/riskCalculators';
 import { evaluateContraceptionAndMirena, evaluateSTRAWStage } from '../clinical-engine/strawStaging';
+import { formulateTreatment } from '../clinical-engine/treatmentEngine';
 import { PatientRecord } from '../clinical-engine/types';
 
 export function generateEmrSummary(record: PatientRecord): string {
@@ -18,14 +19,13 @@ export function generateEmrSummary(record: PatientRecord): string {
   lines.push('=== סיכום ייעוץ ומעקב גיל המעבר (מרפאת רופאת המשפחה) ===');
   lines.push(`תאריך: ${now} | ת.ז/מזהה: ${p.patientId || 'ללא'} | שם: ${p.fullName || 'מטופלת'} | גיל: ${p.age}`);
   lines.push(
-    `מדדים: BMI ${p.bmi.toFixed(1)} (משקל ${p.weightKg} ק"ג, גובה ${p.heightCm} ס"מ) | ל"ד ${p.bpSystolic}/${p.bpDiastolic} ממ"כ | עישון: ${
+    `מדדים: BMI ${p.bmi ? p.bmi.toFixed(1) : '-'} (משקל ${p.weightKg} ק"ג, גובה ${p.heightCm} ס"מ) | ל"ד ${p.bpSystolic}/${p.bpDiastolic} ממ"כ | עישון: ${
       p.isSmoker ? 'מעשנת פעילה' : 'לא'
     }`
   );
   lines.push(`שלב STRAW+10: ${straw.hebrewName} (${straw.code})`);
   lines.push(`אמצעי מניעה נוכחי: ${p.contraception.currentMethod} (${contra.contraceptionRuleHebrew})`);
 
-  // תסמינים מובילים לפי שאלון IMS
   const topSymptomsText =
     sym.topPriorityItems.length > 0
       ? sym.topPriorityItems
@@ -34,7 +34,6 @@ export function generateEmrSummary(record: PatientRecord): string {
       : 'ללא תסמינים מדורגים';
   lines.push(`סימפטומים (שאלון IMS 19 פריטים – סה"כ חומרה ${sym.totalSeverityScore}/76): ${topSymptomsText}`);
 
-  // הערכות סיכון (PREVENT + VTE)
   if (prevent.hasCompleteLabInputs) {
     lines.push(
       `הערכת סיכון קרדיו-וסקולרי AHA PREVENT: 10y Total CVD ${prevent.risk10YearTotalCvd}% | 10y ASCVD ${prevent.risk10YearAscvd}% | 10y HF ${prevent.risk10YearHeartFailure}%${
@@ -64,18 +63,22 @@ export function generateEmrSummary(record: PatientRecord): string {
   if (p.familyHistory.notes.trim()) stage1Notes.push(`היסטוריה משפחתית: ${p.familyHistory.notes.trim()}`);
   if (p.preferences.notes.trim()) stage1Notes.push(`העדפות מטופלת: ${p.preferences.notes.trim()}`);
   if (p.screeningLabsNotes.trim()) stage1Notes.push(`מעבדה וסקר: ${p.screeningLabsNotes.trim()}`);
+  if (p.stage1PatientInstructionsFreeText.trim()) {
+    stage1Notes.push(`הנחיות לבדיקות למטופלת: ${p.stage1PatientInstructionsFreeText.trim()}`);
+  }
 
   if (stage1Notes.length > 0) {
     lines.push(`\nהערות קליניות לידיעת הרופא/ה (שלב 1):\n- ${stage1Notes.join('\n- ')}`);
   }
 
-  // החלטה טיפולית בשלב 2 + אופציה שנבחרה ומדוע + הערות מתוארכות
-  if (record.stage2) {
+  // החלטה טיפולית בשלב 2
+  const recs = record.stage2 || (record.selectedPlan ? formulateTreatment(p) : undefined);
+  if (recs) {
     lines.push('\n--- שלב 2: הגדרת תוכנית הטיפול ---');
-    lines.push(`משטר מומלץ: ${record.stage2.regimenHebrewTitle}`);
+    lines.push(`משטר מומלץ: ${recs.regimenHebrewTitle}`);
     const chosenOption =
-      record.stage2.rankedOptions.find((o) => o.id === record.selectedPlan?.selectedPrimaryOptionId) ||
-      record.stage2.rankedOptions[0];
+      recs.rankedOptions.find((o) => o.id === record.selectedPlan?.selectedPrimaryOptionId) ||
+      recs.rankedOptions[0];
 
     if (chosenOption) {
       lines.push(
@@ -96,14 +99,19 @@ export function generateEmrSummary(record: PatientRecord): string {
       if (reasons) {
         lines.push(`נימוק לבחירת האופציה: ${reasons}`);
       }
-      if (record.selectedPlan.selectedGsmOptionId) {
-        const gsm = record.stage2.localAndAdjunctOptions.find(
-          (l) => l.id === record.selectedPlan?.selectedGsmOptionId
-        );
-        if (gsm) lines.push(`טיפול מקומי משולב ל-GSM: ${gsm.titleHebrew} (${gsm.brandAndDoseHebrew})`);
+      if (record.selectedPlan.selectedGsmOptionIds.length > 0) {
+        const gsms = recs.localGsmOptions
+          .filter((l) => record.selectedPlan?.selectedGsmOptionIds.includes(l.id))
+          .map((l) => l.titleHebrew);
+        if (gsms.length > 0) {
+          lines.push(`טיפולים מקומיים משולבים ל-GSM: ${gsms.join(' + ')}`);
+        }
       }
-      if (record.selectedPlan.includeTestosterone) {
-        lines.push('תוספת נשקלת ל-HSDD: טסטוסטרון עורי במינון נשי פיזיולוגי עם מעקב רמות בדם.');
+      if (record.selectedPlan.includeTestosterone && recs.testosteroneOption) {
+        lines.push(`טיפול נלווה ל-HSDD: ${recs.testosteroneOption.titleHebrew}`);
+      }
+      if (record.selectedPlan.stage2PatientInstructionsFreeText?.trim()) {
+        lines.push(`דגשי נטילה אישיים למטופלת: ${record.selectedPlan.stage2PatientInstructionsFreeText.trim()}`);
       }
     }
 
@@ -126,13 +134,13 @@ export function generateEmrSummary(record: PatientRecord): string {
           v.medicalBackgroundChanged ? `חל שינוי (${v.backgroundChangeDetails || 'עודכן'})` : 'אומת שלא חל שינוי'
         }`
       );
-      if (v.reportedSideEffectIds.length > 0 || v.sideEffectsFreeText) {
-        lines.push(`  - תופעות לוואי: ${[...v.reportedSideEffectIds, v.sideEffectsFreeText].filter(Boolean).join(', ')}`);
-      }
       if (v.hasNewBleeding) {
         lines.push(`  - דימום חדש תחת טיפול: כן (${v.tvsReason || 'בוצע טריאז׳ BMS 2024'})`);
       }
-      lines.push(`  - החלטה/שינוי תרופתי: ${v.updatedRegimenText}`);
+      lines.push(`  - החלטה תרופתית: ${v.updatedRegimenText}`);
+      if (v.patientFollowUpInstructionsFreeText) {
+        lines.push(`  - הנחיות למעקב למטופלת: ${v.patientFollowUpInstructionsFreeText}`);
+      }
       for (const n of v.timestampedNotes) {
         lines.push(`  - הערה [${new Date(n.createdAtIso).toLocaleString('he-IL')}]: ${n.text}`);
       }

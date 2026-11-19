@@ -149,9 +149,10 @@ export function evaluateCompletenessGate(data: Stage1Data): CompletenessGateResu
   // סקר סרטן המעי הגס (דם סמוי בצואה FIT בגילאי 50–74 או קולונוסקופיה בסיכון משפחתי/לינץ')
   if (familyHistory.lynchSyndrome || familyHistory.familyEndometrialOrColorectalCancer) {
     basketRecommendations.push('רקע משפחתי של ממאירות מעי גס/רירית הרחם או תסמונת לינץ׳: לוודא מעקב קולונוסקופיה תקופתי.');
+    patientInstructions.push('תיאום מעקב קולונוסקופיה תקופתי בשל הרקע המשפחתי.');
   } else if (age >= 50 && age <= 74 && (data.fitColorectalStatus === 'OVERDUE' || data.fitColorectalStatus === 'NOT_PERFORMED')) {
     basketRecommendations.push('הפניה לבדיקת דם סמוי בצואה (FIT) שנתית בסל הבריאות (גילאי 50–74).');
-    patientInstructions.push('ביצוע בדיקת דם סמוי בצואה שנתית במעבדת הקופה.');
+    patientInstructions.push('ביצוע בדיקת דם סמוי בצואה (FIT) שנתית במעבדת הקופה.');
   }
 
   // צפיפות עצם (DXA) ו-FRAX
